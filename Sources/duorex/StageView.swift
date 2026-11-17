@@ -36,17 +36,38 @@ final class StageView: NSView {
     /// True while the movie has not taken the latest change. The movie and the pane draw at their own pace.
     private var movieNeedsRender = true
 
+    /// The device, and under it the light its screens throw on the pane.
+    private let deviceLayer = CALayer()
+    private let glowLayer = CALayer()
+    private let glow: Glow
+    /// Whether the screens light the pane around the device. The user's choice is kept from one run to the next.
+    var glows = !UserDefaults.standard.bool(forKey: "glowOff") {
+        didSet {
+            UserDefaults.standard.set(!glows, forKey: "glowOff")
+            glowLayer.isHidden = !glows
+            setNeedsRender()
+        }
+    }
+
     init(scene: DuoScene) {
         self.scene = scene
+        glow = Glow(device: scene.device)
         super.init(frame: .zero)
         wantsLayer = true
         layer?.isOpaque = false
-        layer?.contentsGravity = .resize
+        for sublayer in [glowLayer, deviceLayer] {
+            sublayer.contentsGravity = .resize
+            sublayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+            // A layer of its own fades from one picture to the next unless it is told not to.
+            sublayer.actions = ["contents": NSNull(), "bounds": NSNull(), "position": NSNull(), "hidden": NSNull()]
+            layer?.addSublayer(sublayer)
+        }
+        glowLayer.isHidden = !glows
         // Core Animation draws the shadow from the frame's alpha, so it follows the device's outline.
-        layer?.shadowColor = .black
-        layer?.shadowOpacity = 0.5
-        layer?.shadowRadius = 26
-        layer?.shadowOffset = CGSize(width: 0, height: -20)
+        deviceLayer.shadowColor = .black
+        deviceLayer.shadowOpacity = 0.5
+        deviceLayer.shadowRadius = 26
+        deviceLayer.shadowOffset = CGSize(width: 0, height: -20)
     }
 
     @available(*, unavailable)
@@ -75,7 +96,9 @@ final class StageView: NSView {
         guard width > 1, height > 1, frames.first.map({ $0.width != width || $0.height != height }) ?? true else { return }
         frames = (0..<3).compactMap { _ in Frame(device: scene.device, width: width, height: height) }
         nextFrame = 0
-        layer?.contentsScale = scale
+        deviceLayer.contentsScale = scale
+        deviceLayer.frame = bounds
+        glowLayer.frame = bounds
         setNeedsRender()
     }
 
@@ -192,7 +215,9 @@ final class StageView: NSView {
                     self.rendering = false
                     self.framesDrawn += 1
                     // A resize may have replaced the frames while this one was drawing.
-                    if let frame, self.frames.contains(where: { $0 === frame }) { self.layer?.contents = frame.surface }
+                    guard let frame, self.frames.contains(where: { $0 === frame }) else { return }
+                    self.deviceLayer.contents = frame.surface
+                    if self.glows { self.glowLayer.contents = self.glow.surface(for: frame.surface) }
                 }
             }
         } catch {
