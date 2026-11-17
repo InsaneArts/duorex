@@ -90,3 +90,18 @@ private let there = CGPoint(x: 0.8, y: 0.2)
     let across = SimWire.Activity.drag(from: CGPoint(x: 0.9, y: 0.5), to: CGPoint(x: 0.2, y: 0.5), ended: true)
     #expect(Presence.words(for: across, interface: .portrait) == "swipe ←")
 }
+
+@Test func `a new touch means the finger before it is up`() {
+    // The server follows one finger for a device, and does not always tell that it came up.
+    var presence = Presence()
+    presence.saw(.drag(from: here, to: CGPoint(x: 0.3, y: 0.62), ended: false), time: 10)
+    // The finger went back to where it began, so the server tells a tap and never ends the drag.
+    presence.saw(.tap(here), time: 10.5)
+    #expect(presence.step(to: 10.6).map(\.point) == [here, here])
+    #expect(presence.step(to: 11).isEmpty)
+    #expect(presence.current(at: 13.1) == nil)
+
+    presence.saw(.drag(from: here, to: here, ended: false), time: 20)
+    presence.saw(.drag(from: there, to: there, ended: false), time: 21)
+    #expect(presence.step(to: 21.5).map(\.point) == [there])
+}
