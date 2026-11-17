@@ -13,9 +13,9 @@ enum ContactSheet {
     private static let strip: CGFloat = 400
 
     static func write(_ shots: [Sweep.Shot], to url: URL) throws {
-        guard let image = image(of: shots),
-              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-            throw DuoError.render("could not draw the contact sheet")
+        guard let image = image(of: shots) else { throw DuoError.render("could not draw the contact sheet") }
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+            throw DuoError.render("could not write \(url.path)")
         }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { throw DuoError.render("could not write \(url.path)") }

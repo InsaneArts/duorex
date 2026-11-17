@@ -29,6 +29,7 @@ struct Arguments {
 
 let arguments = Arguments(CommandLine.arguments)
 var session: Session?
+var signalSources: [DispatchSourceSignal] = []
 
 func fail(_ error: any Error) -> Never {
     FileHandle.standardError.write(Data("duorex: \(error)\n".utf8))
@@ -66,16 +67,30 @@ case "snapshot":
     }
     dispatchMain()
 case "sweep":
-    Task {
+    let sweeping = Task {
         do {
+            // Find out now that the sheet can be saved, not after the sweep.
+            let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-sweep.png")
+            guard FileManager.default.isWritableFile(atPath: out.deletingLastPathComponent().path) else {
+                throw DuoError.render("cannot write to \(out.deletingLastPathComponent().path)")
+            }
             let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
             let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
             let shots = try await Sweep(sim: Sim(base: address), scene: scene).run { print($0) }
-            let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-sweep.png")
             try ContactSheet.write(shots, to: out)
             print(out.path)
             exit(0)
+        } catch is CancellationError {
+            exit(130)
         } catch { fail(error) }
+    }
+    // Ctrl-C stops the sweep, and the sweep puts the simulator back before duorex exits.
+    for number in [SIGINT, SIGTERM] {
+        signal(number, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+        source.setEventHandler { sweeping.cancel() }
+        source.resume()
+        signalSources.append(source)
     }
     RunLoop.main.run()
 case "view":
