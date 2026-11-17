@@ -9,8 +9,16 @@ nonisolated struct Mark: Equatable {
     var radius: Double
     /// 0 is invisible, 1 is solid.
     var opacity: Double
-    /// A ring is hollow. Any other mark is filled.
-    var isRing = false
+    var look = Look.spot
+
+    enum Look {
+        /// Another client's finger: a filled spot in the colour of an agent.
+        case spot
+        /// The ring that spreads where another client's finger came up.
+        case ring
+        /// One of the user's own two fingers in a pinch: a pale spot.
+        case finger
+    }
 }
 
 /// What another client of the simulator does, shown on the device. Most of the time the other
@@ -35,8 +43,8 @@ nonisolated struct Presence {
     private var touches: [Touch] = []
     private var latest: (activity: SimWire.Activity, time: Double)?
 
-    /// The size of a fingertip on the screen.
-    private static let radius = 0.045
+    /// The size of a fingertip on the screen, as a share of its shorter side.
+    static let radius = 0.045
     /// Seconds the marks take to fade once the finger is up and the swipe is drawn.
     private static let fade = 0.45
     /// Seconds a finger can stay down. After that, the report of its end was lost.
@@ -133,7 +141,7 @@ nonisolated struct Presence {
         marks.append(Mark(point: along(progress), radius: radius, opacity: 0.95 * min((1 - spread) / 0.6, 1)))
         // The finger came up: a ring spreads from where it was.
         if age >= touch.travel {
-            marks.append(Mark(point: touch.to, radius: radius * (1 + 1.6 * easeOut(spread)), opacity: 0.9 * (1 - spread) * (1 - spread), isRing: true))
+            marks.append(Mark(point: touch.to, radius: radius * (1 + 1.6 * easeOut(spread)), opacity: 0.9 * (1 - spread) * (1 - spread), look: .ring))
         }
         return marks
     }
