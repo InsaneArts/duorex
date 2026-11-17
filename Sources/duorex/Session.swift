@@ -70,14 +70,14 @@ final class Session {
             }
             stage.setNeedsRender()
         }
-        sim.onConfig = { [unowned self] config in
-            interface = Orientation(rawValue: config.orientation) ?? .portrait
+        sim.onReport = { [unowned self] report in
+            interface = Orientation(rawValue: report.orientation) ?? .portrait
             let now = CACurrentMediaTime()
-            if let held = config.duoViewOrientation.flatMap(Orientation.init(rawValue:)),
+            if let held = report.duoViewOrientation.flatMap(Orientation.init(rawValue:)),
                let turned = sync.simulatorReported(held: held, time: now) {
                 stage.rotate(to: turned.roll)
             }
-            if let hinge = config.hingeDegrees {
+            if let hinge = report.hingeDegrees {
                 move(sync.simulatorReported(hinge: hinge, shown: stage.hingeDegrees, time: now))
             }
         }
@@ -85,9 +85,9 @@ final class Session {
             switch effect {
             case .touch(let phase, let point):
                 if phase == .begin { touchEdge = interface.homeEdge(atFramebufferPoint: point) }
-                sim.touch(phase.rawValue, x: point.x, y: point.y, edge: touchEdge)
+                sim.send(.touch(phase, x: point.x, y: point.y, edge: touchEdge))
             case .scroll(let phase, let point):
-                sim.touch(phase.rawValue, x: point.x, y: point.y, edge: nil)
+                sim.send(.touch(phase, x: point.x, y: point.y, edge: nil))
             case .hinge(let degrees):
                 sync.userMovedHinge(time: CACurrentMediaTime())
                 sim.fold(to: degrees)
@@ -120,9 +120,9 @@ final class Session {
         let edge = interface.homeEdge(atFramebufferPoint: start)
         for step in 0...steps {
             let point = interface.framebufferPoint(CGPoint(x: 0.5, y: 0.985 - 0.5 * Double(step) / Double(steps)))
-            let phase = step == 0 ? "begin" : step == steps ? "end" : "move"
+            let phase: DeviceMotion.TouchPhase = step == 0 ? .begin : step == steps ? .end : .move
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.016) {
-                sim.touch(phase, x: point.x, y: point.y, edge: edge)
+                sim.send(.touch(phase, x: point.x, y: point.y, edge: edge))
             }
         }
     }
@@ -154,7 +154,7 @@ final class Session {
             case "r":
                 let held = sync.userTurned(time: CACurrentMediaTime())
                 stage.rotate(to: held.roll)
-                sim?.rotate(to: held.rawValue)
+                sim?.send(.rotate(held))
             default: break
             }
         case .resized:

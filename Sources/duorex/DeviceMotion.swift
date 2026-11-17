@@ -17,7 +17,7 @@ nonisolated struct Probe: Equatable {
 /// in a recording. Pointer positions are in view points with the origin at the top left. Each
 /// pointer call gets a `probe` that says what the scene has under a point.
 nonisolated struct DeviceMotion {
-    enum TouchPhase: String {
+    enum TouchPhase {
         case begin, move, end
     }
 
