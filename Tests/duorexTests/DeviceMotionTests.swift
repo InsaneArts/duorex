@@ -301,3 +301,71 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     motion.pointerLeft()
     #expect(motion.hovered == nil)
 }
+
+// MARK: Sound
+
+/// The sounds among some effects.
+private func sounds(_ effects: [DeviceMotion.Effect]) -> [DeviceMotion.Sound] {
+    effects.compactMap { if case .sound(let sound, _) = $0 { sound } else { nil } }
+}
+
+@Test func `the device makes a sound when it shuts and when it opens flat`() {
+    var motion = motion()
+    motion.fold(to: 0)
+    #expect(sounds(run(&motion, from: 100, seconds: 3)) == [.shut])
+    motion.fold(to: 180)
+    #expect(sounds(run(&motion, from: 103, seconds: 3)) == [.flat])
+    // A fold that stops half way makes none.
+    motion.fold(to: 130)
+    #expect(sounds(run(&motion, from: 106, seconds: 3)).isEmpty)
+}
+
+@Test func `a device that the simulator folds makes the same sounds`() {
+    var motion = motion()
+    motion.follow(hinge: 0, animated: true)
+    #expect(sounds(run(&motion, from: 100, seconds: 3)) == [.shut])
+}
+
+@Test func `a device that takes the simulator's angle at once makes no sound`() {
+    var motion = motion()
+    // As at the start, when the simulator is already shut.
+    motion.follow(hinge: 0, animated: false)
+    #expect(sounds(run(&motion, from: 100, seconds: 1)).isEmpty)
+    motion.follow(hinge: 180, animated: true)
+    #expect(sounds(run(&motion, from: 101, seconds: 3)) == [.flat])
+}
+
+@Test func `a hinge held near shut makes one sound, not one for each small move`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 185, y: 300), option: false, probe: probe)
+    var heard: [DeviceMotion.Sound] = []
+    var time = 100.0
+    // Pulled shut, then moved a few degrees open and shut again, four times.
+    for x in [585.0, 580, 585, 578, 585, 580, 585, 579, 585] {
+        _ = motion.pointerMoved(to: CGPoint(x: x, y: 300), probe: probe)
+        time += 0.05
+        heard += sounds(motion.step(to: time).effects)
+    }
+    #expect(heard == [.shut])
+}
+
+@Test func `a fast shut is louder than a slow one`() {
+    func strength(of effects: [DeviceMotion.Effect]) -> Double {
+        effects.compactMap { if case .sound(_, let strength) = $0 { strength } else { nil } }.first ?? -1
+    }
+    var fast = motion()
+    fast.fold(to: 0)
+    let hard = strength(of: run(&fast, from: 100, seconds: 3))
+    // The same way by hand, a degree at a time.
+    var slow = motion()
+    _ = slow.pointerDown(at: CGPoint(x: 185, y: 300), option: false, probe: probe)
+    var soft = -1.0, time = 100.0
+    for step in 0...200 {
+        _ = slow.pointerMoved(to: CGPoint(x: 185 + Double(step) * 2, y: 300), probe: probe)
+        time += 0.05
+        let effects = slow.step(to: time).effects
+        if strength(of: effects) >= 0 { soft = strength(of: effects) }
+    }
+    #expect(soft >= 0 && soft < hard)
+    #expect(hard <= 1)
+}
