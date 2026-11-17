@@ -14,6 +14,8 @@ final class StageView: NSView {
     var onTouch: ((TouchPhase, DuoScene.ScreenHit) -> Void)?
     /// Called while the hinge moves because of the user. The simulator follows it.
     var onHinge: ((Double) -> Void)?
+    /// False while the hinge is following the simulator, so its own motion is not sent back to it.
+    private var userOwnsHinge = true
 
     private enum Grab {
         case none
@@ -99,9 +101,19 @@ final class StageView: NSView {
 
     var hingeDegrees: Double { hinge.value }
 
-    /// Animates to a hinge angle that the simulator or a key asked for.
+    /// Animates to a hinge angle the user asked for.
     func fold(to degrees: Double) {
+        userOwnsHinge = true
         hinge.target = min(max(degrees, 0), 180)
+    }
+
+    /// Takes the hinge angle the simulator reports, as when an agent folds the device.
+    func follow(hinge degrees: Double, animated: Bool) {
+        guard case .none = grab else { return }
+        userOwnsHinge = false
+        if animated { hinge.target = degrees } else { hinge.hold(degrees) }
+        reportedHinge = degrees
+        setNeedsRender()
     }
 
     /// Animates the device to a quarter-turn rotation, in degrees.
@@ -123,6 +135,7 @@ final class StageView: NSView {
         } else if option || scene.screenHit(at: unit(point), panel: activePanel, reach: bezelReach) != nil {
             // Pulling the leaf that moves closes it toward the other; pulling the fixed leaf mirrors that.
             let fixedLeaf = hinge.value > 90 && point.x > bounds.midX
+            userOwnsHinge = true
             grab = .fold(from: point, hinge: hinge.value, sign: fixedLeaf ? 1 : -1)
         } else {
             grab = .tilt(from: point, yaw: yaw.value, pitch: pitch.value)
@@ -220,7 +233,7 @@ final class StageView: NSView {
         }
         let moving = [hinge.step(dt), yaw.step(dt), pitch.step(dt), roll.step(dt)].contains(true)
         if moving { setNeedsRender() }
-        if abs(hinge.value - reportedHinge) >= 0.5 || (!moving && hinge.value != reportedHinge) {
+        if userOwnsHinge, abs(hinge.value - reportedHinge) >= 0.5 || (!moving && hinge.value != reportedHinge) {
             reportedHinge = hinge.value
             onHinge?(hinge.value)
         }

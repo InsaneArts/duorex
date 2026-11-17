@@ -65,12 +65,19 @@ case "view":
     NSApplication.shared.setActivationPolicy(.accessory)
     Task {
         do {
-            session = try Session(scene: try await scene())
-            session?.start()
+            let running = try Session(scene: try await scene())
+            session = running
+            running.start()
+            guard !arguments.flag("pattern") else { return }
+            do {
+                running.attach(to: try await SimServer.address(device: arguments.string("device"), server: arguments.string("server")))
+            } catch {
+                running.show("\(error)")
+            }
         } catch { fail(error) }
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--finish Dark|Light]\n       duorex snapshot [--hinge deg] [--yaw deg] [--pitch deg] [--roll deg] [--pattern] [--out file.png]\n".utf8))
+    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex snapshot [--hinge deg] [--yaw deg] [--pitch deg] [--roll deg] [--pattern] [--out file.png]\n".utf8))
     exit(2)
 }

@@ -74,7 +74,7 @@ final class Dock {
         let pointer = Self.pointerLocation()
         defer { lastPointer = pointer }
         guard let window = Self.window(under: pointer, excluding: getpid()) else {
-            log.notice("no host window under the pointer at \(pointer.x, format: .fixed(precision: 0)), \(pointer.y, format: .fixed(precision: 0))")
+            log.info("no host window under the pointer at \(pointer.x, format: .fixed(precision: 0)), \(pointer.y, format: .fixed(precision: 0))")
             return
         }
         // A report lags the pointer by a few milliseconds, so only a slow pointer gives a true origin.
@@ -86,7 +86,7 @@ final class Dock {
         let measured = CGPoint(x: pointer.x - local.x - window.bounds.minX, y: pointer.y - local.y - window.bounds.minY)
         if let origin, hypot(origin.x - measured.x, origin.y - measured.y) < 1 { return }
         origin = measured
-        log.notice("pane origin in window: \(measured.x, format: .fixed(precision: 1)), \(measured.y, format: .fixed(precision: 1))")
+        log.info("pane origin in window: \(measured.x, format: .fixed(precision: 1)), \(measured.y, format: .fixed(precision: 1))")
         learnChrome()
         follow()
     }
@@ -112,7 +112,7 @@ final class Dock {
                            width: paneSize.width, height: paneSize.height)
         if panel.frame != frame { panel.setFrame(frame, display: false) }
         if !panel.isVisible {
-            log.notice("showing the device at \(frame.debugDescription, privacy: .public)")
+            log.info("showing the device at \(frame.debugDescription, privacy: .public)")
             panel.orderFrontRegardless()
             restack()
             stage.setNeedsRender()

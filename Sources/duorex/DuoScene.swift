@@ -128,8 +128,19 @@ final class DuoScene {
     /// Shows `texture` on a screen, or turns the screen off with nil.
     func setScreen(_ panel: Panel, texture: TextureResource?) {
         guard let slot = slots[panel] else { return }
+        // The screen is a light source: unlit, and outside the tone mapping the body gets.
         var material = UnlitMaterial(applyPostProcessToneMap: false)
-        material.color = texture.map { .init(tint: .white, texture: .init($0)) } ?? .init(tint: .black)
+        if let texture {
+            // Trilinear and anisotropic filtering keep text readable on a tilted leaf.
+            let sampler = MTLSamplerDescriptor()
+            sampler.minFilter = .linear
+            sampler.magFilter = .linear
+            sampler.mipFilter = .linear
+            sampler.maxAnisotropy = 8
+            material.color = .init(tint: .white, texture: .init(texture, sampler: .init(sampler)))
+        } else {
+            material.color = .init(tint: .black)
+        }
         slot.entity.model?.materials[slot.material] = material
     }
 
