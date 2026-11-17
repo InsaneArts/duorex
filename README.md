@@ -6,7 +6,7 @@ duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. T
 
 ## Fold it like the real thing
 
-Drag the frame and the device folds under your pointer. The simulator's hinge follows, so your app lays out again as the angle changes. Let go anywhere between closed and flat and it stays there.
+Drag the frame and the device folds under your pointer. The simulator's hinge follows, so your app lays out again as the angle changes. Let go and it stays at that angle. Close to shut or to flat, it finishes the move.
 
 `1`, `2` and `3` go to closed, book and open. `[` and `]` move the hinge 10 degrees.
 
@@ -27,8 +27,8 @@ Move the Rex window or change the layout and the device follows. Switch to anoth
 duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve-sim), so an agent in the next pane can drive it from the shell while you watch:
 
 ```sh
-npx serve-sim tap 0.5 0.4 -d "duorex Duo"    # a point on the screen, from 0 to 1
-npx serve-sim fold 130 -d "duorex Duo"
+npx serve-sim tap 0.5 0.4    # a point on the screen, from 0 to 1
+npx serve-sim fold 130
 ```
 
 When the agent folds the device, the one in your pane folds too.
@@ -64,13 +64,15 @@ duorex update
 ## Remove
 
 ```sh
-rm ~/.local/bin/duorex ~/.config/rex/duorex.lua
+rm -f ~/.local/bin/duorex ~/.config/rex/duorex.lua
 rm -rf ~/.local/share/duorex
+defaults delete duorex 2>/dev/null   # the saved pane position
 ```
 
-Delete the two lines from `~/.config/rex/init.lua` if you added them. To delete the simulator too:
+Delete the two lines from `~/.config/rex/init.lua` if you added them. serve-sim keeps running after duorex quits. To stop it and delete the simulator:
 
 ```sh
+npx serve-sim --kill
 xcrun simctl delete "duorex Duo"
 ```
 
