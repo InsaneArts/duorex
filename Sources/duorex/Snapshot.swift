@@ -1,4 +1,5 @@
 import AppKit
+import CoreImage
 import ImageIO
 import Metal
 import RealityKit
@@ -6,10 +7,13 @@ import UniformTypeIdentifiers
 
 /// Renders one frame to a PNG without opening a window. Used to check the renderer.
 enum Snapshot {
-    static func write(scene: DuoScene, pose: Pose, width: Int, height: Int, backdrop: CGColor? = nil, to url: URL) async throws {
+    static func write(scene: DuoScene, pose: Pose, width: Int, height: Int, backdrop: CGColor? = nil, onStage: Bool = false, to url: URL) async throws {
         guard let frame = Frame(device: scene.device, width: width, height: height) else { throw DuoError.render("could not create the snapshot frame") }
         try await scene.draw(pose, into: frame)
-        guard var image = frame.image(),
+        let staged = onStage ? CIContext(mtlDevice: scene.device).createCGImage(
+            Stage.compose(CIImage(ioSurface: frame.surface), over: Stage.image(width: width, height: height)),
+            from: CGRect(x: 0, y: 0, width: width, height: height)) : nil
+        guard var image = staged ?? frame.image(),
               let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { throw DuoError.render("could not encode the snapshot") }
         if let backdrop, let space = image.colorSpace,
