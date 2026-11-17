@@ -12,6 +12,8 @@ final class StageView: NSView {
     var onEffect: ((DeviceMotion.Effect) -> Void)?
     /// The pointer came to rest on a hardware button, or left it.
     var onHover: ((HardwareButton?) -> Void)?
+    /// When set, every change to the device also goes into its movie.
+    var recorder: Recorder?
 
     private var motion = DeviceMotion()
     private var link: CADisplayLink?
@@ -135,12 +137,21 @@ final class StageView: NSView {
     // MARK: Frame
 
     @objc private func tick(_ link: CADisplayLink) {
-        let step = motion.step(to: CACurrentMediaTime())
+        let now = CACurrentMediaTime()
+        let step = motion.step(to: now)
         step.effects.forEach { onEffect?($0) }
         if step.moving { setNeedsRender() }
-        guard needsRender, !rendering, window?.isVisible == true, !frames.isEmpty else { return }
-        needsRender = false
+        guard needsRender else { return }
         scene.apply(motion.pose)
+        // The movie gets every change, whether or not the pane can show it.
+        recorder?.capture(scene: scene, time: now)
+        guard window?.isVisible == true, !frames.isEmpty else {
+            needsRender = false
+            return
+        }
+        // The last frame is still drawing. Try again at the next tick.
+        guard !rendering else { return }
+        needsRender = false
         let frame = frames[nextFrame]
         nextFrame = (nextFrame + 1) % frames.count
         rendering = true

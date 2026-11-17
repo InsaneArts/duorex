@@ -17,13 +17,20 @@ final class Session {
     private var touchEdge: Int?
     private var framesDecoded = 0
 
-    private static let hint = "drag the frame to fold  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q quit"
+    private var quitting = false
+
+    private var hint: String {
+        stage.recorder == nil ? "drag the frame to fold  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q quit"
+                              : "● recording  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q stops and saves"
+    }
     /// Hinge angles for the three poses the number keys choose.
     private static let poses: [Character: Double] = ["1": 0, "2": 130, "3": 180]
 
-    init(scene: DuoScene) throws {
+    /// `movie` is where to record the device to, or nil to only show it.
+    init(scene: DuoScene, movie: (url: URL, width: Int, height: Int)? = nil) throws {
         pane = try Pane()
         stage = StageView(scene: scene)
+        stage.recorder = try movie.map { try Recorder(scene: scene, url: $0.url, width: $0.width, height: $0.height) }
         feed = try ScreenFeed(scene: scene)
         rex = RexHost()
         dock = Dock(stage: stage, hostBundleID: rex == nil ? nil : RexHost.bundleID)
@@ -57,16 +64,20 @@ final class Session {
     /// Connects the device to a simulator on serve-sim.
     func attach(to address: URL) {
         log.info("simulator at \(address.absoluteString, privacy: .public)")
+        let attached = CACurrentMediaTime()
         let sim = Sim(base: address)
         self.sim = sim
         sim.onFrame = { [unowned self] frame in
+            if framesDecoded == 0, status != hint {
+                log.info("first picture \(CACurrentMediaTime() - attached, format: .fixed(precision: 2)) s after attaching")
+            }
             framesDecoded += 1
             guard let panel = feed.show(frame) else { return }
-            if panel != stage.activePanel || status != Self.hint {
+            if panel != stage.activePanel || status != hint {
                 stage.activePanel = panel
                 feed.turnOff(panel.other)
                 move(sync.panelLit(panel))
-                show(Self.hint)
+                show(hint)
             }
             stage.setNeedsRender()
         }
@@ -174,10 +185,21 @@ final class Session {
         pane.caption(status)
     }
 
-    private func quit() -> Never {
+    private func quit() {
+        guard !quitting else { return }
+        quitting = true
         sim?.stop()
         rex?.stop()
-        pane.restore()
-        exit(0)
+        guard let recorder = stage.recorder else {
+            pane.restore()
+            exit(0)
+        }
+        show("saving the movie…")
+        Task {
+            await recorder.finish(scene: stage.scene, time: CACurrentMediaTime())
+            pane.restore()
+            print(recorder.url.path)
+            exit(0)
+        }
     }
 }
