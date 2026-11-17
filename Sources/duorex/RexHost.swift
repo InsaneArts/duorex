@@ -3,6 +3,7 @@ import Foundation
 /// Asks Rex where this pane sits in its window, and whether its tab is the one showing.
 final class RexHost {
     static let bundleID = "com.superlogical.rex"
+    private nonisolated static let layoutEvents = ["session_view_changed", "window_created", "window_closed", "block_created", "block_closed"]
 
     var onChange: ((Dock.Placement) -> Void)?
 
@@ -24,7 +25,7 @@ final class RexHost {
 
     func start() {
         refresh()
-        // Any event in the session can move the pane, so each one triggers a fresh look.
+        // Terminals in the session report titles and status all the time. Only layout events move the pane.
         let events = Process()
         events.executableURL = rex
         events.arguments = ["events", "--session", session, "--json"]
@@ -32,7 +33,8 @@ final class RexHost {
         events.standardOutput = pipe
         events.standardError = FileHandle.nullDevice
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            guard !handle.availableData.isEmpty else { return }
+            let text = String(decoding: handle.availableData, as: UTF8.self)
+            guard Self.layoutEvents.contains(where: { text.contains("\"type\":\"\($0)\"") }) else { return }
             DispatchQueue.main.async { self?.refresh() }
         }
         do { try events.run() } catch { log.error("rex events: \(error.localizedDescription, privacy: .public)") }
@@ -58,7 +60,10 @@ final class RexHost {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.refreshing = false
-                if let placement = self.placement(from: data) { self.onChange?(placement) }
+                if let placement = self.placement(from: data) {
+                    log.info("rex pane \(placement.rect.debugDescription, privacy: .public) shown \(placement.shown)")
+                    self.onChange?(placement)
+                }
                 if self.stale {
                     self.stale = false
                     self.refresh()

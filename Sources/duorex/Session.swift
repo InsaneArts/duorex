@@ -15,8 +15,14 @@ final class Session {
     private var touchEdge: Int?
     private var hingeKnown = false
     private var lastHingeSent = Date.distantPast
+    private var framesDecoded = 0
 
-    private static let hint = "drag the frame to fold  ·  1 2 3 poses  ·  h home  ·  q quit"
+    /// How the user holds the device, as serve-sim names it.
+    private var viewOrientation = "portrait"
+
+    private static let hint = "drag the frame to fold  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q quit"
+    /// The device's roll for each way of holding it, in the order the r key steps through.
+    private static let rolls: KeyValuePairs = ["portrait": 0.0, "landscape_left": -90, "portrait_upside_down": -180, "landscape_right": 90]
     /// Hinge angles for the three poses the number keys choose.
     private static let poses: [Character: Double] = ["1": 0, "2": 130, "3": 180]
 
@@ -42,13 +48,24 @@ final class Session {
             source.resume()
             signals.append(source)
         }
+        // `log stream --level debug --predicate 'process == "duorex"'` shows the frame rates.
+        let rates = Timer(timeInterval: 2, repeats: true) { [unowned self] _ in
+            MainActor.assumeIsolated {
+                log.debug("decoded \(self.framesDecoded / 2) fps, drawn \(self.stage.framesDrawn / 2) fps")
+                framesDecoded = 0
+                stage.resetFrameCount()
+            }
+        }
+        RunLoop.main.add(rates, forMode: .common)
     }
 
     /// Connects the device to a simulator on serve-sim.
     func attach(to address: URL) {
+        log.info("simulator at \(address.absoluteString, privacy: .public)")
         let sim = Sim(base: address)
         self.sim = sim
         sim.onFrame = { [unowned self] frame in
+            framesDecoded += 1
             guard let panel = feed.show(frame) else { return }
             if panel != stage.activePanel || status != Self.hint {
                 stage.activePanel = panel
@@ -61,6 +78,10 @@ final class Session {
         }
         sim.onConfig = { [unowned self] config in
             orientation = config.orientation
+            if let held = config.duoViewOrientation, held != viewOrientation, let roll = Self.rolls.first(where: { $0.key == held }) {
+                viewOrientation = held
+                stage.rotate(to: roll.value)
+            }
             guard let hinge = config.hingeDegrees else { return }
             // The simulator echoes the user's own fold a moment late. Only a change from elsewhere is news.
             let external = Date().timeIntervalSince(lastHingeSent) > 1 && abs(hinge - stage.hingeDegrees) > 3
@@ -115,6 +136,12 @@ final class Session {
             case "[": stage.fold(to: stage.hingeDegrees - 10)
             case "]": stage.fold(to: stage.hingeDegrees + 10)
             case "h": sim?.press("swipe_home")
+            case "r":
+                let current = Self.rolls.firstIndex { $0.key == viewOrientation } ?? 0
+                let next = Self.rolls[(current + 1) % Self.rolls.count]
+                viewOrientation = next.key
+                stage.rotate(to: next.value)
+                sim?.rotate(to: next.key)
             default: break
             }
         case .resized:

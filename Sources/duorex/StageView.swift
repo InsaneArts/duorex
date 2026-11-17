@@ -41,6 +41,10 @@ final class StageView: NSView {
     private var nextSurface = 0
     private var surfaceGeneration = 0
     private var rendering = false
+    /// Frames drawn since the last reading, for the frame rate in the debug log.
+    private(set) var framesDrawn = 0
+
+    func resetFrameCount() { framesDrawn = 0 }
     /// Frames still to draw. The fold rig settles one frame after the pose stops changing.
     private var pendingFrames = 3
 
@@ -53,6 +57,11 @@ final class StageView: NSView {
         wantsLayer = true
         layer?.isOpaque = false
         layer?.contentsGravity = .resize
+        // Core Animation draws the shadow from the frame's alpha, so it follows the device's outline.
+        layer?.shadowColor = .black
+        layer?.shadowOpacity = 0.5
+        layer?.shadowRadius = 26
+        layer?.shadowOffset = CGSize(width: 0, height: -20)
     }
 
     @available(*, unavailable)
@@ -248,6 +257,7 @@ final class StageView: NSView {
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.rendering = false
+                    self.framesDrawn += 1
                     // A resize may have replaced the surfaces while this frame was drawing.
                     if generation == self.surfaceGeneration { self.layer?.contents = self.surfaces[index].surface }
                 }
