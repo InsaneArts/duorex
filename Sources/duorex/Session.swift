@@ -196,10 +196,16 @@ final class Session {
         }
         show("saving the movie…")
         Task {
-            await recorder.finish(scene: stage.scene, time: CACurrentMediaTime())
-            pane.restore()
-            print(recorder.url.path)
-            exit(0)
+            do {
+                try await recorder.finish(scene: stage.scene, time: CACurrentMediaTime())
+                pane.restore()
+                print(recorder.url.path)
+                exit(0)
+            } catch {
+                pane.restore()
+                FileHandle.standardError.write(Data("duorex: \(error)\n".utf8))
+                exit(1)
+            }
         }
     }
 }
