@@ -10,8 +10,8 @@ final class StageView: NSView {
     var activePanel = Panel.inner
     /// What the user's motion asks of the simulator.
     var onEffect: ((DeviceMotion.Effect) -> Void)?
-    /// The pointer came to rest on a hardware button or on the frame, or left it.
-    var onHover: ((DeviceMotion.Hover?) -> Void)?
+    /// The pointer came to rest on a hardware button, or left it.
+    var onHover: ((HardwareButton?) -> Void)?
     /// Another client of the simulator did something, or has been quiet for a moment.
     var onActivity: ((SimWire.Activity?) -> Void)?
     /// When set, every change to the device also goes into its movie.
@@ -121,9 +121,9 @@ final class StageView: NSView {
 
     /// `pressed` is whether the terminal says that a button is down.
     func pointerMoved(to point: CGPoint, option: Bool, pressed: Bool) {
-        let hovered = motion.hovered
+        let hovered = motion.hoveredButton
         send(motion.pointerMoved(to: point, option: option, pressed: pressed) { probe($0) })
-        if motion.hovered != hovered { onHover?(motion.hovered) }
+        if motion.hoveredButton != hovered { onHover?(motion.hoveredButton) }
     }
 
     func pointerUp(at point: CGPoint) {
@@ -132,7 +132,7 @@ final class StageView: NSView {
 
     /// The pointer left the pane, so the device stops turning toward it.
     func pointerLeft() {
-        let hovered = motion.hovered
+        let hovered = motion.hoveredButton
         motion.pointerLeft()
         if hovered != nil { onHover?(nil) }
     }
