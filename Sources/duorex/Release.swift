@@ -5,10 +5,11 @@ enum Release {
     /// Matches the release tag: version 0.1.0 is tagged v0.1.0.
     static let version = "0.1.0"
 
-    /// Where `install.sh` keeps the source it builds from.
+    /// Where `install.sh` keeps the source it builds from. It reads the same variables as the installer.
     private static var source: URL {
-        if let custom = ProcessInfo.processInfo.environment["DUOREX_SRC"] { return URL(fileURLWithPath: custom) }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share/duorex/src")
+        let environment = ProcessInfo.processInfo.environment
+        if let custom = environment["DUOREX_SRC"] { return URL(fileURLWithPath: custom) }
+        return URL(fileURLWithPath: environment["HOME"] ?? NSHomeDirectory()).appendingPathComponent(".local/share/duorex/src")
     }
 
     /// Runs the installer again. It fetches the newest release and rebuilds only when there is one.
