@@ -11,8 +11,8 @@ final class Session {
     private var sync = PoseSync()
     private var signals: [DispatchSourceSignal] = []
     private var status = "starting the simulator…"
-    /// The hardware button under the pointer.
-    private var hovered: HardwareButton?
+    /// The hardware button or the frame under the pointer.
+    private var hovered: DeviceMotion.Hover?
     /// What another client of the simulator does now.
     private var activity: SimWire.Activity?
     /// How the interface is turned inside the lit panel's framebuffer.
@@ -120,9 +120,9 @@ final class Session {
                 sim.send(.button(button, pressed: pressed))
             }
         }
-        // The buttons are small. Naming the one under the pointer shows where they are.
-        stage.onHover = { [unowned self] button in
-            hovered = button
+        // The buttons are small and the frame is thin. The line says what a press there takes hold of.
+        stage.onHover = { [unowned self] hover in
+            hovered = hover
             caption()
         }
         sim.onActivity = { [unowned self] activity in
@@ -147,7 +147,11 @@ final class Session {
         if let note {
             pane.caption(note)
         } else if let hovered {
-            pane.caption("\(hovered.rawValue) button")
+            switch hovered {
+            case .button(let button): pane.caption("\(button.rawValue) button")
+            // A drag from the frame folds, and a drag from beside it turns the device. The two are close.
+            case .frame: pane.caption(stage.hingeDegrees < 10 ? "drag to open" : "drag to fold")
+            }
         } else if let activity {
             pane.caption("● agent  ·  \(Presence.words(for: activity, interface: interface))", accent: true)
         } else {
