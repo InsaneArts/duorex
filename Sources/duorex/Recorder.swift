@@ -76,6 +76,14 @@ final class Recorder {
         return true
     }
 
+    /// Adds the scene, as it is posed now, at `time`, and returns when that picture is in the
+    /// movie. It is for a film that is drawn at its own pace, not at the pace it plays.
+    func add(scene: DuoScene, time: Double) async {
+        while drawing || !input.isReadyForMoreMediaData { try? await Task.sleep(for: .milliseconds(1)) }
+        draw(scene, at: time)
+        while drawing { try? await Task.sleep(for: .milliseconds(1)) }
+    }
+
     /// Ends the movie at `time`, so it lasts as long as the recording did, and writes the file.
     /// Throws when the file could not be written, as when the disk is full.
     func finish(scene: DuoScene, time: Double) async throws {
