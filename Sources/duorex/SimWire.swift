@@ -114,7 +114,8 @@ nonisolated enum SimWire {
         }
 
         private static func activity(from event: [String: Any]) -> Activity? {
-            guard let kind = event["kind"] as? String else { return nil }
+            // "hid" is input to the simulator. The log also holds what the server does itself.
+            guard event["source"] as? String == "hid", let kind = event["kind"] as? String else { return nil }
             let details = event["details"] as? [String: Any] ?? [:]
             func point(_ name: String) -> CGPoint? {
                 guard let value = details[name] as? [String: Any], let x = value["x"] as? Double, let y = value["y"] as? Double else { return nil }
@@ -130,6 +131,9 @@ nonisolated enum SimWire {
                 return .button(event["action"] as? String ?? "", phase: details["phase"] as? String ?? "press")
             case "rotate":
                 return .rotate(event["action"] as? String ?? "")
+            case "touch":
+                // A part of a touch that the log could not join to a whole one. It tells nothing by itself.
+                return nil
             default:
                 return .other(kind)
             }
