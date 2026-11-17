@@ -372,6 +372,41 @@ private func sounds(_ effects: [DeviceMotion.Effect]) -> [DeviceMotion.Sound] {
 
 // MARK: Found by review
 
+@Test func `a click late in a long way back does not take the bounce from a small tilt`() {
+    func swing(clickDuringReturn: Bool) -> Double {
+        var motion = motion()
+        _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+        _ = motion.pointerMoved(to: CGPoint(x: 550, y: 50), probe: probe)
+        _ = motion.pointerUp(at: CGPoint(x: 550, y: 50), probe: probe)
+        var time = 100.0
+        // Until the device is nearly back, and still moving.
+        while abs(motion.pose.yaw) > 20 {
+            time += 1.0 / 60
+            _ = motion.step(to: time)
+        }
+        if clickDuringReturn {
+            _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+            _ = motion.pointerUp(at: CGPoint(x: 50, y: 50), probe: probe)
+        }
+        _ = run(&motion, from: time, seconds: 4)
+        // A small tilt, let go.
+        _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+        _ = motion.pointerMoved(to: CGPoint(x: 90, y: 50), probe: probe)
+        _ = motion.pointerUp(at: CGPoint(x: 90, y: 50), probe: probe)
+        var past = 0.0
+        time += 4
+        let end = time + 4
+        while time < end {
+            time += 1.0 / 60
+            _ = motion.step(to: time)
+            past = min(past, motion.pose.yaw)
+        }
+        return past
+    }
+    #expect(swing(clickDuringReturn: false) < -1)
+    #expect(swing(clickDuringReturn: true) < -1)
+}
+
 @Test func `a press on the background holds a device that was on its way back`() {
     var motion = motion()
     _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
