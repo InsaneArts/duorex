@@ -70,6 +70,7 @@ extension Array {
 
 func scene() async throws -> DuoScene {
     let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
+    scene.isWireframe = arguments.flag("wireframe")
     if arguments.flag("pattern") {
         scene.setScreen(.cover, texture: try Snapshot.testPattern(label: "COVER", width: 600, height: 1300))
         scene.setScreen(.inner, texture: try Snapshot.testPattern(label: "INNER", width: 1200, height: 1300))
@@ -131,7 +132,7 @@ case "film":
         guard size.count == 2, size.allSatisfy({ (64...4096).contains($0) && $0 % 2 == 0 }) else {
             throw DuoError.render("--size takes a width and a height, both even, such as 1920x1080")
         }
-        let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
+        let scene = try await scene()
         var screens: [CGImage]
         if arguments.flag("pattern") {
             // No simulator: the test patterns stand in for the app.
