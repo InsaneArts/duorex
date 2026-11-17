@@ -15,15 +15,20 @@ nonisolated enum SimWire {
     /// `[length: UInt32 big endian][tag: UInt8][payload]`, where the length counts the tag.
     struct Stream {
         private var pending = Data()
+        /// True once a length made no sense. The stream has lost its place in the bytes, so
+        /// nothing after that point can be read. Only a new connection starts clean.
+        private(set) var isOutOfStep = false
 
         mutating func read(_ bytes: Data) -> [Record] {
+            guard !isOutOfStep else { return [] }
             pending.append(bytes)
             var records: [Record] = []
             var offset = pending.startIndex
             while pending.endIndex - offset >= 4 {
                 let length = pending[offset..<offset + 4].reduce(0) { $0 << 8 | Int($1) }
-                // No record is this large. The stream is out of step, and only a new connection fixes that.
+                // No record is this large.
                 guard length <= 64_000_000 else {
+                    isOutOfStep = true
                     pending.removeAll()
                     return records
                 }
