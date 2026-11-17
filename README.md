@@ -20,7 +20,7 @@ Drag the background to tilt the device. It springs back when you let go.
 
 The power, volume and camera control buttons on the frame are real. Click one and it goes into the frame, and the simulator gets the press: the volume changes, the screen locks. Hold it and the simulator sees it held.
 
-The buttons are small, so rest the pointer on one and the pane names it.
+The buttons are small, so rest the pointer on one and the pane names it. On a closed device the front half covers them, and they still work where the pane names them.
 
 ## See every posture at once
 
@@ -117,6 +117,7 @@ Options:
 
 ## Limits
 
+- The camera control press goes to the simulator, but iOS showed no reaction to it in our tests.
 - Typing does not reach the simulator. With Xcode 27, serve-sim can type only through Device Hub.
 - Folding and touches on the inner screen use private Xcode interfaces through serve-sim, so an Xcode update can break them. duorex pins the serve-sim release it was written against.
 - Outside Rex, the device does not hide when you switch tabs, because other terminals do not report their layout.
