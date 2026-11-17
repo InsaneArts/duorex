@@ -118,6 +118,29 @@ final class Session {
         return depth >= 0.93 ? edge : nil
     }
 
+    /// Goes home the way a finger does: a quick swipe up from the bottom edge of the interface.
+    /// serve-sim's own home button does not reach the Duo.
+    private func swipeHome() {
+        guard let sim else { return }
+        let steps = 12
+        for step in 0...steps {
+            let height = 0.985 - 0.5 * Double(step) / Double(steps)
+            // The interface can be turned inside the framebuffer.
+            let point: CGPoint = switch orientation {
+            case "landscape_left": CGPoint(x: height, y: 0.5)
+            case "landscape_right": CGPoint(x: 1 - height, y: 0.5)
+            case "portrait_upside_down": CGPoint(x: 0.5, y: 1 - height)
+            default: CGPoint(x: 0.5, y: height)
+            }
+            if step == 0 { touchEdge = Self.homeEdge(at: point, orientation: orientation) }
+            let phase = step == 0 ? "begin" : step == steps ? "end" : "move"
+            let edge = touchEdge
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.016) {
+                sim.touch(phase, x: point.x, y: point.y, edge: edge)
+            }
+        }
+    }
+
     private func handle(_ event: Pane.Event) {
         switch event {
         case .pointer(let pointer):
@@ -135,7 +158,7 @@ final class Session {
             case "1", "2", "3": stage.fold(to: Self.poses[key]!)
             case "[": stage.fold(to: stage.hingeDegrees - 10)
             case "]": stage.fold(to: stage.hingeDegrees + 10)
-            case "h": sim?.press("swipe_home")
+            case "h": swipeHome()
             case "r":
                 let current = Self.rolls.firstIndex { $0.key == viewOrientation } ?? 0
                 let next = Self.rolls[(current + 1) % Self.rolls.count]

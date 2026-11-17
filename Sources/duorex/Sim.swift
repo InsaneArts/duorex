@@ -86,9 +86,6 @@ final class Sim: NSObject, URLSessionDataDelegate {
 
     func rotate(to orientation: String) { send(0x07, ["orientation": orientation]) }
 
-    /// Presses a named button: "swipe_home", "app_switcher", "lock".
-    func press(_ button: String) { send(0x04, ["button": button]) }
-
     private func send(_ tag: UInt8, _ message: [String: Any]) {
         guard let socket, let json = try? JSONSerialization.data(withJSONObject: message) else { return }
         socket.send(.data(Data([tag]) + json)) { error in
