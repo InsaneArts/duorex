@@ -9,6 +9,8 @@ nonisolated struct Probe: Equatable {
     var nearest: CGPoint?
     /// True when the pointer is on the frame around the lit screen.
     var onFrame = false
+    /// The hardware button under the pointer.
+    var button: HardwareButton?
 }
 
 /// The device's pose and what the pointer does to it: touch, scroll, tilt and fold.

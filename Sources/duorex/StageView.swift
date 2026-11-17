@@ -130,7 +130,7 @@ final class StageView: NSView {
         let step = motion.step(to: CACurrentMediaTime())
         step.effects.forEach { onEffect?($0) }
         if step.moving { setNeedsRender() }
-        guard needsRender || scene.needsSettling, !rendering, window?.isVisible == true, !frames.isEmpty else { return }
+        guard needsRender, !rendering, window?.isVisible == true, !frames.isEmpty else { return }
         needsRender = false
         scene.apply(motion.pose)
         let frame = frames[nextFrame]
