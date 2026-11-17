@@ -19,22 +19,6 @@ enum DuoError: Error, CustomStringConvertible {
 /// The 3D iPhone Duo: Apple's model from the selected Xcode, a fold rig, and two live screens.
 /// The model lookup, fold rig and screen slots follow serve-sim's DuoRenderer (Apache-2.0).
 final class DuoScene {
-    enum Panel: String { case cover, inner }
-
-    /// How the device sits in front of the camera. Angles are in degrees.
-    struct Pose: Equatable {
-        var hinge: Double = 180   // 0 is closed, 180 is flat
-        var roll: Double = 0      // rotation about the view axis
-        var yaw: Double = 0       // tilt left and right
-        var pitch: Double = 0     // tilt up and down
-    }
-
-    /// A point on a screen, 0...1 in that panel's framebuffer with the origin at the top left.
-    struct ScreenHit {
-        var panel: Panel
-        var point: CGPoint
-    }
-
     let device: MTLDevice
     private let renderer: RealityRenderer
     private let orbit = Entity()
@@ -53,6 +37,8 @@ final class DuoScene {
     private let fieldOfView: Float = 2 * atan(36 / (2 * 105.0)) * 180 / .pi
     /// The fold clip runs from flat to closed over its first five seconds.
     private static let foldClip = (name: "l_over_r", seconds: 5.0)
+    /// How far past the glass still counts as the frame, in framebuffer units.
+    private static let frameWidth: Float = 0.09
     private static let screenMaterials: [Panel: String] = [.cover: "YqugYDOqMSOpqyA", .inner: "CvyXbAGXoolRUYl"]
 
     /// Apple's Duo model inside the selected Xcode. It is read in place and never copied.
@@ -179,16 +165,16 @@ final class DuoScene {
                                      whenScheduled: { _ in whenScheduled?() }, onComplete: { _ in onComplete?() })
     }
 
-    /// The screen point under a view position. `point` is 0...1 with the origin at the top left.
-    /// `reach` is how far past the glass still counts, in framebuffer units: 0 for a tap,
-    /// a bezel width to find the frame, infinity to follow a drag that left the screen.
-    func screenHit(at point: CGPoint, panel: Panel, reach: Float = 0) -> ScreenHit? {
-        guard let surface = surfaces[panel] else { return nil }
+    /// What the scene has under a point of the view. `point` is 0...1 with the origin at the top left.
+    func probe(at point: CGPoint, panel: Panel) -> Probe {
+        guard let surface = surfaces[panel] else { return Probe() }
         let tangent = tan(fieldOfView * .pi / 360)
         let direction = simd_normalize(SIMD3<Float>((Float(point.x) * 2 - 1) * aspect * tangent, (1 - Float(point.y) * 2) * tangent, -1))
         let hits = surface.worldLeaves().compactMap { $0.intersect(origin: camera.position, direction: direction) }
-        guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }), nearest.outside <= reach else { return nil }
-        return ScreenHit(panel: panel, point: CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y)))
+        guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }) else { return Probe() }
+        let onScreen = CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y))
+        return Probe(glass: nearest.outside == 0 ? onScreen : nil, nearest: onScreen,
+                     onFrame: nearest.outside > 0 && nearest.outside <= Self.frameWidth)
     }
 
     /// Backs the camera off so the device fills the view at any tilt, and closes in as it folds.

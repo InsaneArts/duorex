@@ -8,21 +8,16 @@ final class Session {
     private let feed: ScreenFeed
     private let rex: RexHost?
     private var sim: Sim?
+    private var sync = PoseSync()
     private var signals: [DispatchSourceSignal] = []
     private var status = "starting the simulator…"
-    /// The simulator's interface orientation, which decides where the home swipe starts.
-    private var orientation = "portrait"
+    /// How the interface is turned inside the lit panel's framebuffer.
+    private var interface = Orientation.portrait
+    /// The edge tag of the touch in progress, when it began as the swipe home.
     private var touchEdge: Int?
-    private var hingeKnown = false
-    private var lastHingeSent = Date.distantPast
     private var framesDecoded = 0
 
-    /// How the user holds the device, as serve-sim names it.
-    private var viewOrientation = "portrait"
-
     private static let hint = "drag the frame to fold  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q quit"
-    /// The device's roll for each way of holding it, in the order the r key steps through.
-    private static let rolls: KeyValuePairs = ["portrait": 0.0, "landscape_left": -90, "portrait_upside_down": -180, "landscape_right": 90]
     /// Hinge angles for the three poses the number keys choose.
     private static let poses: [Character: Double] = ["1": 0, "2": 130, "3": 180]
 
@@ -69,33 +64,34 @@ final class Session {
             guard let panel = feed.show(frame) else { return }
             if panel != stage.activePanel || status != Self.hint {
                 stage.activePanel = panel
-                feed.turnOff(panel == .cover ? .inner : .cover)
-                // Until the simulator reports its hinge, the lit panel says whether it is open.
-                if !hingeKnown { stage.follow(hinge: panel == .cover ? 0 : 180, animated: false) }
+                feed.turnOff(panel.other)
+                move(sync.panelLit(panel))
                 show(Self.hint)
             }
             stage.setNeedsRender()
         }
         sim.onConfig = { [unowned self] config in
-            orientation = config.orientation
-            if let held = config.duoViewOrientation, held != viewOrientation, let roll = Self.rolls.first(where: { $0.key == held }) {
-                viewOrientation = held
-                stage.rotate(to: roll.value)
+            interface = Orientation(rawValue: config.orientation) ?? .portrait
+            let now = CACurrentMediaTime()
+            if let held = config.duoViewOrientation.flatMap(Orientation.init(rawValue:)),
+               let turned = sync.simulatorReported(held: held, time: now) {
+                stage.rotate(to: turned.roll)
             }
-            guard let hinge = config.hingeDegrees else { return }
-            // The simulator echoes the user's own fold a moment late. Only a change from elsewhere is news.
-            let external = Date().timeIntervalSince(lastHingeSent) > 1 && abs(hinge - stage.hingeDegrees) > 3
-            if !hingeKnown || external { stage.follow(hinge: hinge, animated: hingeKnown) }
-            hingeKnown = true
+            if let hinge = config.hingeDegrees {
+                move(sync.simulatorReported(hinge: hinge, shown: stage.hingeDegrees, time: now))
+            }
         }
-        stage.onTouch = { [unowned self] phase, hit in
-            if phase == .begin { touchEdge = Self.homeEdge(at: hit.point, orientation: orientation) }
-            sim.touch(phase.rawValue, x: hit.point.x, y: hit.point.y, edge: touchEdge)
-        }
-        stage.onHinge = { [unowned self] degrees in
-            lastHingeSent = Date()
-            hingeKnown = true
-            sim.fold(to: degrees)
+        stage.onEffect = { [unowned self] effect in
+            switch effect {
+            case .touch(let phase, let point):
+                if phase == .begin { touchEdge = interface.homeEdge(atFramebufferPoint: point) }
+                sim.touch(phase.rawValue, x: point.x, y: point.y, edge: touchEdge)
+            case .scroll(let phase, let point):
+                sim.touch(phase.rawValue, x: point.x, y: point.y, edge: nil)
+            case .hinge(let degrees):
+                sync.userMovedHinge(time: CACurrentMediaTime())
+                sim.fold(to: degrees)
+            }
         }
         sim.start()
     }
@@ -106,16 +102,13 @@ final class Session {
         pane.caption(status)
     }
 
-    /// A touch that starts in the bottom 7% of the interface is the swipe home. serve-sim wants it
-    /// tagged with the framebuffer edge it starts from: 1 left, 2 top, 3 bottom, 4 right.
-    private static func homeEdge(at point: CGPoint, orientation: String) -> Int? {
-        let (edge, depth): (Int, Double) = switch orientation {
-        case "landscape_left": (4, point.x)
-        case "landscape_right": (1, 1 - point.x)
-        case "portrait_upside_down": (2, 1 - point.y)
-        default: (3, point.y)
+    /// Does what the sync decided about a hinge angle from the simulator.
+    private func move(_ action: PoseSync.HingeAction) {
+        switch action {
+        case .snap(let degrees): stage.follow(hinge: degrees, animated: false)
+        case .follow(let degrees): stage.follow(hinge: degrees, animated: true)
+        case .ignore: break
         }
-        return depth >= 0.93 ? edge : nil
     }
 
     /// Goes home the way a finger does: a quick swipe up from the bottom edge of the interface.
@@ -123,18 +116,11 @@ final class Session {
     private func swipeHome() {
         guard let sim else { return }
         let steps = 12
+        let start = interface.framebufferPoint(CGPoint(x: 0.5, y: 0.985))
+        let edge = interface.homeEdge(atFramebufferPoint: start)
         for step in 0...steps {
-            let height = 0.985 - 0.5 * Double(step) / Double(steps)
-            // The interface can be turned inside the framebuffer.
-            let point: CGPoint = switch orientation {
-            case "landscape_left": CGPoint(x: height, y: 0.5)
-            case "landscape_right": CGPoint(x: 1 - height, y: 0.5)
-            case "portrait_upside_down": CGPoint(x: 0.5, y: 1 - height)
-            default: CGPoint(x: 0.5, y: height)
-            }
-            if step == 0 { touchEdge = Self.homeEdge(at: point, orientation: orientation) }
+            let point = interface.framebufferPoint(CGPoint(x: 0.5, y: 0.985 - 0.5 * Double(step) / Double(steps)))
             let phase = step == 0 ? "begin" : step == steps ? "end" : "move"
-            let edge = touchEdge
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(step) * 0.016) {
                 sim.touch(phase, x: point.x, y: point.y, edge: edge)
             }
@@ -166,11 +152,9 @@ final class Session {
             case "]": stage.fold(to: stage.hingeDegrees + 10)
             case "h": swipeHome()
             case "r":
-                let current = Self.rolls.firstIndex { $0.key == viewOrientation } ?? 0
-                let next = Self.rolls[(current + 1) % Self.rolls.count]
-                viewOrientation = next.key
-                stage.rotate(to: next.value)
-                sim?.rotate(to: next.key)
+                let held = sync.userTurned(time: CACurrentMediaTime())
+                stage.rotate(to: held.roll)
+                sim?.rotate(to: held.rawValue)
             default: break
             }
         case .resized:

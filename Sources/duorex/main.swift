@@ -53,7 +53,7 @@ case "update":
 case "snapshot":
     Task {
         do {
-            let pose = DuoScene.Pose(hinge: arguments.double("hinge", default: 180), roll: arguments.double("roll", default: 0),
+            let pose = Pose(hinge: arguments.double("hinge", default: 180), roll: arguments.double("roll", default: 0),
                                      yaw: arguments.double("yaw", default: 0), pitch: arguments.double("pitch", default: 0))
             let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex.png")
             let gray = arguments.string("backdrop").flatMap(Double.init)
