@@ -31,6 +31,8 @@ nonisolated struct DeviceMotion {
         case scroll(TouchPhase, CGPoint)
         /// The user moved the hinge to this angle.
         case hinge(Double)
+        /// The user pressed a hardware button, or let it go.
+        case button(HardwareButton, pressed: Bool)
     }
 
     private enum Grab {
@@ -38,6 +40,7 @@ nonisolated struct DeviceMotion {
         case touch
         case tilt(from: CGPoint, yaw: Double, pitch: Double)
         case fold(from: CGPoint, hinge: Double, sign: Double)
+        case button(HardwareButton)
     }
 
     /// The size of the view the pointer moves in, in points.
@@ -47,6 +50,9 @@ nonisolated struct DeviceMotion {
     private var yaw = Spring(0, response: 0.5, damping: 0.55)
     private var pitch = Spring(0, response: 0.5, damping: 0.55)
     private var roll = Spring(0, response: 0.45, damping: 0.8)
+    /// How far in the pushed button is: 0 is out, 1 is fully in. A button travels fast.
+    private var press = Spring(0, response: 0.13, damping: 0.7)
+    private var pushed: HardwareButton?
     private var grab = Grab.none
     private var lastTouch: CGPoint?
     private var lastHover = -Double.infinity
@@ -57,8 +63,12 @@ nonisolated struct DeviceMotion {
     private var userOwnsHinge = true
     private var time = 0.0
 
+    /// The hardware button under a pointer that is not pressed.
+    private(set) var hoveredButton: HardwareButton?
+
     var pose: Pose {
-        Pose(hinge: hinge.value, roll: roll.value, yaw: yaw.value, pitch: pitch.value)
+        Pose(hinge: hinge.value, roll: roll.value, yaw: yaw.value, pitch: pitch.value,
+             press: pushed.map { .init(button: $0, depth: press.value) })
     }
 
     /// True while a press that began on the device is still held.
@@ -95,7 +105,12 @@ nonisolated struct DeviceMotion {
     mutating func pointerDown(at point: CGPoint, option: Bool, probe: (CGPoint) -> Probe) -> [Effect] {
         var effects = liftWheelFinger()
         let under = probe(point)
-        if !option, let glass = under.glass {
+        if !option, let button = under.button {
+            grab = .button(button)
+            pushed = button
+            press.target = 1
+            effects.append(.button(button, pressed: true))
+        } else if !option, let glass = under.glass {
             grab = .touch
             lastTouch = glass
             effects.append(.touch(.begin, glass))
@@ -116,6 +131,7 @@ nonisolated struct DeviceMotion {
         case .none:
             // A little parallax toward the pointer keeps the device feeling like an object.
             lastHover = time
+            hoveredButton = probe(point).button
             yaw.target = (Double(point.x / viewSize.width) - 0.5) * 9
             pitch.target = (Double(point.y / viewSize.height) - 0.5) * 6
         case .touch:
@@ -130,6 +146,8 @@ nonisolated struct DeviceMotion {
             let turn = roll.value * .pi / 180
             let reach = 0.5 * (abs(cos(turn)) * Double(viewSize.width) + abs(sin(turn)) * Double(viewSize.height))
             hinge.hold(min(max(start + sign * along(point, from: from) / reach * 180, 0), 180))
+        case .button:
+            break   // a button stays down until the pointer lets go, wherever it is
         }
         return []
     }
@@ -142,6 +160,9 @@ nonisolated struct DeviceMotion {
         case .fold:
             // Close enough to shut or flat finishes the move.
             if hinge.value < 14 { hinge.target = 0 } else if hinge.value > 166 { hinge.target = 180 }
+        case .button(let button):
+            press.target = 0
+            effects.append(.button(button, pressed: false))
         case .tilt, .none:
             break
         }
@@ -154,6 +175,7 @@ nonisolated struct DeviceMotion {
     /// The pointer left the view, so the device stops turning toward it.
     mutating func pointerLeft() {
         lastHover = -.infinity
+        hoveredButton = nil
     }
 
     /// One wheel step. Positive `lines` scrolls the content down, as a finger moving up does.
@@ -185,7 +207,8 @@ nonisolated struct DeviceMotion {
             yaw.target = 0
             pitch.target = 0
         }
-        let moving = [hinge.step(elapsed), yaw.step(elapsed), pitch.step(elapsed), roll.step(elapsed)].contains(true)
+        let moving = [hinge.step(elapsed), yaw.step(elapsed), pitch.step(elapsed), roll.step(elapsed), press.step(elapsed)].contains(true)
+        if press.value == 0, press.target == 0 { pushed = nil }
         if userOwnsHinge, abs(hinge.value - reportedHinge) >= 0.5 || (!moving && hinge.value != reportedHinge) {
             reportedHinge = hinge.value
             effects.append(.hinge(hinge.value))

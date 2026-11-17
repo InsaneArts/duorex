@@ -84,6 +84,8 @@ nonisolated enum SimWire {
         case touch(DeviceMotion.TouchPhase, x: Double, y: Double, edge: Int?)
         case fold(degrees: Double)
         case rotate(Orientation)
+        /// A hardware button going down or coming up.
+        case button(HardwareButton, pressed: Bool)
 
         /// The bytes of the socket message: a tag and a JSON object.
         var data: Data {
@@ -94,6 +96,8 @@ nonisolated enum SimWire {
                 (0x0E, ["hinge": (degrees * 10).rounded() / 10])
             case .rotate(let orientation):
                 (0x07, ["orientation": orientation.rawValue])
+            case .button(let button, let pressed):
+                (0x04, ["button": button.rawValue, "page": button.usage.page, "usage": button.usage.usage, "phase": pressed ? "down" : "up"])
             }
             return Data([tag]) + ((try? JSONSerialization.data(withJSONObject: fields)) ?? Data())
         }

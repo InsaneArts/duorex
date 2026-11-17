@@ -10,6 +10,8 @@ final class StageView: NSView {
     var activePanel = Panel.inner
     /// What the user's motion asks of the simulator.
     var onEffect: ((DeviceMotion.Effect) -> Void)?
+    /// The pointer came to rest on a hardware button, or left it.
+    var onHover: ((HardwareButton?) -> Void)?
 
     private var motion = DeviceMotion()
     private var link: CADisplayLink?
@@ -100,7 +102,9 @@ final class StageView: NSView {
     }
 
     func pointerMoved(to point: CGPoint) {
+        let hovered = motion.hoveredButton
         send(motion.pointerMoved(to: point) { probe($0) })
+        if motion.hoveredButton != hovered { onHover?(motion.hoveredButton) }
     }
 
     func pointerUp(at point: CGPoint) {
@@ -108,7 +112,11 @@ final class StageView: NSView {
     }
 
     /// The pointer left the pane, so the device stops turning toward it.
-    func pointerLeft() { motion.pointerLeft() }
+    func pointerLeft() {
+        let hovered = motion.hoveredButton
+        motion.pointerLeft()
+        if hovered != nil { onHover?(nil) }
+    }
 
     /// One wheel step. Positive `lines` scrolls the content down.
     func scroll(at point: CGPoint, lines: Double) {
