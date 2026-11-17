@@ -5,7 +5,11 @@ import Testing
 /// A flat screen in the middle of an 800 by 600 view, with a 30 point frame around it.
 private let glass = CGRect(x: 200, y: 150, width: 400, height: 300)
 
+/// The power button, on the right edge of the device.
+private let powerButton = CGPoint(x: 640, y: 250)
+
 private func probe(_ point: CGPoint) -> Probe {
+    if hypot(point.x - powerButton.x, point.y - powerButton.y) < 20 { return Probe(button: .power) }
     let nearest = CGPoint(x: min(max((point.x - glass.minX) / glass.width, 0), 1),
                           y: min(max((point.y - glass.minY) / glass.height, 0), 1))
     if glass.contains(point) { return Probe(glass: nearest, nearest: nearest) }
@@ -128,4 +132,35 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     // The simulator reports a new hinge angle while the touch is held.
     motion.follow(hinge: 60, animated: false)
     #expect(motion.pose.hinge == 180)
+}
+
+@Test func `a press on a button holds it down until the pointer lets go`() {
+    var motion = motion()
+    #expect(motion.pointerDown(at: powerButton, option: false, probe: probe) == [.button(.power, pressed: true)])
+    #expect(motion.isDragging)
+    // The pointer slides off the button and onto the glass. The button stays down and nothing is touched.
+    #expect(motion.pointerMoved(to: CGPoint(x: 400, y: 300), probe: probe).isEmpty)
+    #expect(motion.pointerUp(at: CGPoint(x: 400, y: 300), probe: probe) == [.button(.power, pressed: false)])
+    #expect(!motion.isDragging)
+}
+
+@Test func `a pressed button goes in and comes back out`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: powerButton, option: false, probe: probe)
+    _ = run(&motion, from: 100, seconds: 1)
+    #expect(motion.pose.press == Pose.Press(button: .power, depth: 1))
+    _ = motion.pointerUp(at: powerButton, probe: probe)
+    _ = run(&motion, from: 101, seconds: 1)
+    #expect(motion.pose.press == nil)
+}
+
+@Test func `the button under a resting pointer is known`() {
+    var motion = motion()
+    _ = motion.pointerMoved(to: powerButton, probe: probe)
+    #expect(motion.hoveredButton == .power)
+    _ = motion.pointerMoved(to: CGPoint(x: 50, y: 50), probe: probe)
+    #expect(motion.hoveredButton == nil)
+    _ = motion.pointerMoved(to: powerButton, probe: probe)
+    motion.pointerLeft()
+    #expect(motion.hoveredButton == nil)
 }

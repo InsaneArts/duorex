@@ -54,8 +54,11 @@ case "update":
 case "snapshot":
     Task {
         do {
-            let pose = Pose(hinge: arguments.double("hinge", default: 180), roll: arguments.double("roll", default: 0),
-                                     yaw: arguments.double("yaw", default: 0), pitch: arguments.double("pitch", default: 0))
+            var pose = Pose(hinge: arguments.double("hinge", default: 180), roll: arguments.double("roll", default: 0),
+                            yaw: arguments.double("yaw", default: 0), pitch: arguments.double("pitch", default: 0))
+            if let button = arguments.string("press").flatMap({ name in HardwareButton.allCases.first { $0.rawValue.lowercased() == name.lowercased() } }) {
+                pose.press = .init(button: button, depth: 1)
+            }
             let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex.png")
             let gray = arguments.string("backdrop").flatMap(Double.init)
             try await Snapshot.write(scene: try await scene(), pose: pose, width: Int(arguments.double("width", default: 1400)),
