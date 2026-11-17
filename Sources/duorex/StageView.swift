@@ -27,6 +27,8 @@ final class StageView: NSView {
 
     func resetFrameCount() { framesDrawn = 0 }
     private var needsRender = true
+    /// True while the movie has not taken the latest change. The movie and the pane draw at their own pace.
+    private var movieNeedsRender = true
 
     init(scene: DuoScene) {
         self.scene = scene
@@ -72,7 +74,10 @@ final class StageView: NSView {
     }
 
     /// Asks for a new frame, as when a screen texture changed.
-    func setNeedsRender() { needsRender = true }
+    func setNeedsRender() {
+        needsRender = true
+        movieNeedsRender = true
+    }
 
     var hingeDegrees: Double { motion.pose.hinge }
 
@@ -141,10 +146,11 @@ final class StageView: NSView {
         let step = motion.step(to: now)
         step.effects.forEach { onEffect?($0) }
         if step.moving { setNeedsRender() }
-        guard needsRender else { return }
+        guard needsRender || movieNeedsRender else { return }
         scene.apply(motion.pose)
         // The movie gets every change, whether or not the pane can show it.
-        recorder?.capture(scene: scene, time: now)
+        if movieNeedsRender { movieNeedsRender = !(recorder?.capture(scene: scene, time: now) ?? true) }
+        guard needsRender else { return }
         guard window?.isVisible == true, !frames.isEmpty else {
             needsRender = false
             return
