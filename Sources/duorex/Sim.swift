@@ -56,10 +56,16 @@ final class Sim: NSObject, URLSessionDataDelegate {
 
     // MARK: Input
 
-    func send(_ message: SimWire.Message) {
+    /// `sent` runs when the message is out, or at once when there is no connection to send it on.
+    func send(_ message: SimWire.Message, sent done: (@MainActor @Sendable () -> Void)? = nil) {
         sent.note(message, time: CACurrentMediaTime())
-        socket?.send(.data(message.data)) { error in
+        guard let socket else {
+            if let done { Task { @MainActor in done() } }
+            return
+        }
+        socket.send(.data(message.data)) { error in
             if let error { log.error("input: \(error.localizedDescription, privacy: .public)") }
+            if let done { Task { @MainActor in done() } }
         }
     }
 
