@@ -55,6 +55,7 @@ final class Session {
     func start() {
         pane.onEvent = { [unowned self] event in handle(event) }
         pane.start()
+        if let session = RexHost.session { Panes.opened(in: session) }
         paneResized()
         // The stage works without a simulator too: it folds, makes its sounds and names its parts.
         stage.onEffect = { [unowned self] effect in
@@ -298,6 +299,7 @@ final class Session {
     private func leave() {
         guard !leaving else { return }
         leaving = true
+        Panes.closed()
         sim?.stop()
         rex?.stop()
         guard let recorder = stage.recorder else {
