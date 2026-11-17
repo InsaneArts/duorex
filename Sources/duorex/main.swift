@@ -119,7 +119,7 @@ case "strobe":
         if !arguments.flag("pattern") {
             // The picture shows the app as it is on the open device, on every exposure.
             let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-            let screen = try await Sweep(sim: Sim(base: address), scene: scene).screens(at: [180])[0]
+            let screen = try await SimDriver(sim: Sim(base: address)).screens(at: [180])[0]
             scene.setScreen(.inner, texture: try await TextureResource(image: screen, options: .init(semantic: .color)))
         }
         try await Strobe.write(scene: scene, width: size[0], height: size[1], to: out)
@@ -140,7 +140,7 @@ case "film":
         } else {
             let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
             print("taking the app's screens from the simulator")
-            screens = try await Sweep(sim: Sim(base: address), scene: scene).screens(at: [0, 180, FilmScript.book])
+            screens = try await SimDriver(sim: Sim(base: address)).screens(at: [0, 180, FilmScript.book])
         }
         let textures: [TextureResource] = try await screens.isEmpty
             ? [Snapshot.testPattern(label: "COVER", width: 600, height: 1300), Snapshot.testPattern(label: "INNER", width: 1200, height: 1300),
