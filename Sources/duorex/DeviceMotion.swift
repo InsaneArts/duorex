@@ -103,7 +103,9 @@ nonisolated struct DeviceMotion {
     // MARK: Pointer
 
     mutating func pointerDown(at point: CGPoint, option: Bool, probe: (CGPoint) -> Probe) -> [Effect] {
-        var effects = liftWheelFinger()
+        // A press while one is still held means the terminal lost the release. End the held one first.
+        var effects = isDragging ? pointerUp(at: point, probe: probe) : []
+        effects += liftWheelFinger()
         let under = probe(point)
         if !option, let button = under.button {
             grab = .button(button)

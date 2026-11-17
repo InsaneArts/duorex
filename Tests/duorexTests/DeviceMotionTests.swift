@@ -164,3 +164,18 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     motion.pointerLeft()
     #expect(motion.hoveredButton == nil)
 }
+
+@Test func `a press after a lost release lets the held button go first`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: powerButton, option: false, probe: probe)
+    // The terminal never reported the release. The next press is on the glass.
+    #expect(motion.pointerDown(at: CGPoint(x: 400, y: 300), option: false, probe: probe)
+        == [.button(.power, pressed: false), .touch(.begin, CGPoint(x: 0.5, y: 0.5))])
+}
+
+@Test func `a press after a lost release lifts the finger that was down`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 400, y: 300), option: false, probe: probe)
+    #expect(motion.pointerDown(at: CGPoint(x: 500, y: 300), option: false, probe: probe)
+        == [.touch(.end, CGPoint(x: 0.75, y: 0.5)), .touch(.begin, CGPoint(x: 0.75, y: 0.5))])
+}
