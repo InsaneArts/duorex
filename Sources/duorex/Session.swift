@@ -115,7 +115,10 @@ final class Session {
             hovered = button
             caption()
         }
-        sim.onActivity = { [unowned self] activity in stage.saw(activity) }
+        sim.onActivity = { [unowned self] activity in
+            log.debug("another client: \(String(describing: activity), privacy: .public)")
+            stage.saw(activity)
+        }
         stage.onActivity = { [unowned self] activity in
             self.activity = activity
             caption()
