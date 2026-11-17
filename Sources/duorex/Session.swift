@@ -23,6 +23,7 @@ final class Session {
     private var framesDecoded = 0
 
     private var quitting = false
+    private var leaving = false
 
     /// The keys, as lines short enough for a narrow pane. "?" shows the next line.
     private var hint: String {
@@ -283,6 +284,16 @@ final class Session {
     private func quit() {
         guard !quitting else { return }
         quitting = true
+        // The simulator stays slow after duorex is gone. So turn off what duorex turned on, and
+        // leave when that message is out, or after a moment if the simulator is gone too.
+        guard slow, let sim else { return leave() }
+        sim.send(.slowAnimations(false)) { [unowned self] in leave() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.leave() }
+    }
+
+    private func leave() {
+        guard !leaving else { return }
+        leaving = true
         sim?.stop()
         rex?.stop()
         guard let recorder = stage.recorder else {
