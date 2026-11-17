@@ -119,9 +119,10 @@ final class StageView: NSView {
         send(motion.pointerDown(at: point, option: option) { probe($0) })
     }
 
-    func pointerMoved(to point: CGPoint, option: Bool) {
+    /// `pressed` is whether the terminal says that a button is down.
+    func pointerMoved(to point: CGPoint, option: Bool, pressed: Bool) {
         let hovered = motion.hovered
-        send(motion.pointerMoved(to: point, option: option) { probe($0) })
+        send(motion.pointerMoved(to: point, option: option, pressed: pressed) { probe($0) })
         if motion.hovered != hovered { onHover?(motion.hovered) }
     }
 

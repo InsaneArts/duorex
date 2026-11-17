@@ -436,3 +436,25 @@ private func sounds(_ effects: [DeviceMotion.Effect]) -> [DeviceMotion.Sound] {
     #expect(strength != nil)
     #expect((strength ?? 1) < 0.4)
 }
+
+@Test func `a move with no button down ends a press whose release was lost`() {
+    var motion = motion()
+    // The terminal tells a drag as a drag.
+    _ = motion.pointerDown(at: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    _ = motion.pointerMoved(to: CGPoint(x: 310, y: 225), option: true, pressed: true, probe: probe)
+    _ = motion.pointerUp(at: CGPoint(x: 310, y: 225), probe: probe)
+    // A pinch begins, and its release never arrives.
+    _ = motion.pointerDown(at: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    let ended = motion.pointerMoved(to: CGPoint(x: 360, y: 270), pressed: false, probe: probe)
+    #expect(ended.contains { if case .pinch(.end, _, _) = $0 { true } else { false } })
+    #expect(!motion.isDragging)
+    #expect(motion.fingers.isEmpty)
+}
+
+@Test func `a terminal that tells every move the same way keeps its drags`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 400, y: 300), option: false, probe: probe)
+    // No report ever said that a button was down, so a move may still be a drag.
+    #expect(motion.pointerMoved(to: CGPoint(x: 500, y: 300), pressed: false, probe: probe) == [.touch(.move, CGPoint(x: 0.75, y: 0.5))])
+    #expect(motion.isDragging)
+}
