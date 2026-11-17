@@ -222,7 +222,7 @@ final class Session {
             }
             switch pointer.kind {
             case .down: stage.pointerDown(at: point, option: pointer.option)
-            case .move, .drag: stage.pointerMoved(to: point, option: pointer.option)
+            case .move, .drag: stage.pointerMoved(to: point, option: pointer.option, pressed: pointer.kind == .drag)
             case .up: stage.pointerUp(at: point)
             case .wheel(let lines): stage.scroll(at: point, lines: lines)
             }
