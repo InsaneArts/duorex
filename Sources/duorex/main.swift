@@ -1,33 +1,6 @@
 import AppKit
 import RealityKit
 
-/// Reads `--name value` pairs and bare flags after the subcommand.
-struct Arguments {
-    private var values: [String: String] = [:]
-    let command: String
-
-    init(_ raw: [String]) {
-        var rest = Array(raw.dropFirst())
-        command = rest.first.map { $0.hasPrefix("-") ? "view" : $0 } ?? "view"
-        if rest.first == command { rest.removeFirst() }
-        var index = 0
-        while index < rest.count {
-            let name = rest[index]
-            if name.hasPrefix("--"), index + 1 < rest.count, !rest[index + 1].hasPrefix("--") {
-                values[String(name.dropFirst(2))] = rest[index + 1]
-                index += 2
-            } else {
-                values[String(name.drop(while: { $0 == "-" }))] = ""
-                index += 1
-            }
-        }
-    }
-
-    func string(_ name: String) -> String? { values[name] }
-    func double(_ name: String, default fallback: Double) -> Double { values[name].flatMap(Double.init) ?? fallback }
-    func flag(_ name: String) -> Bool { values[name] != nil }
-}
-
 let arguments = Arguments(CommandLine.arguments)
 var session: Session?
 var signalSources: [DispatchSourceSignal] = []
