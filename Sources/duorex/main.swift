@@ -59,6 +59,15 @@ func untilDone(_ work: @escaping () async throws -> Void) -> Never {
     exit(0)
 }
 
+extension Array {
+    /// Like `map`, for work that waits. The elements are done in order.
+    func asyncMap<T>(_ transform: (Element) async throws -> T) async rethrows -> [T] {
+        var results: [T] = []
+        for element in self { results.append(try await transform(element)) }
+        return results
+    }
+}
+
 func scene() async throws -> DuoScene {
     let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
     if arguments.flag("pattern") {
@@ -115,6 +124,32 @@ case "strobe":
         try await Strobe.write(scene: scene, width: size[0], height: size[1], to: out)
         print(out.path)
     }
+case "film":
+    untilDone {
+        let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-film.mp4")
+        let size = (arguments.string("size") ?? "1920x1080").split(separator: "x").compactMap { Int($0) }
+        guard size.count == 2, size.allSatisfy({ (64...4096).contains($0) && $0 % 2 == 0 }) else {
+            throw DuoError.render("--size takes a width and a height, both even, such as 1920x1080")
+        }
+        let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
+        var screens: [CGImage]
+        if arguments.flag("pattern") {
+            // No simulator: the test patterns stand in for the app.
+            screens = []
+        } else {
+            let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+            print("taking the app's screens from the simulator")
+            screens = try await Sweep(sim: Sim(base: address), scene: scene).screens(at: [0, 180, FilmScript.book])
+        }
+        let textures: [TextureResource] = try await screens.isEmpty
+            ? [Snapshot.testPattern(label: "COVER", width: 600, height: 1300), Snapshot.testPattern(label: "INNER", width: 1200, height: 1300),
+               Snapshot.testPattern(label: "BOOK", width: 1200, height: 1300)]
+            : screens.asyncMap { try await TextureResource(image: $0, options: .init(semantic: .color)) }
+        try await Film(scene: scene).write(screens: (textures[0], textures[1], textures[2]), to: out, width: size[0], height: size[1]) { share in
+            print("drawing: \(Int(share * 100))%")
+        }
+        print(out.path)
+    }
 case "sweep":
     untilDone {
         // Find out now that the sheet can be saved, not after the sweep.
@@ -158,6 +193,6 @@ case "view", "record":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex record [--out movie.mp4] [--size 1920x1080]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex strobe [--out poster.png] [--size 2560x1440]\n       duorex update\n       duorex version\n".utf8))
+    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex record [--out movie.mp4] [--size 1920x1080]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex strobe [--out poster.png] [--size 2560x1440]\n       duorex film [--out film.mp4] [--size 1920x1080]\n       duorex update\n       duorex version\n".utf8))
     exit(2)
 }
