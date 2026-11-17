@@ -14,6 +14,8 @@ Drag the frame and the device folds under your pointer. The simulator's hinge fo
 
 `1`, `2` and `3` go to closed, book and open. `[` and `]` move the hinge 10 degrees.
 
+The frame is thin. When the pointer is on it, the line under the device says `drag to fold`, so you know before you press. A drag from beside the frame turns the device.
+
 ## Touch what you see
 
 Click, drag and scroll on either screen. The touch lands where you point, on a flat screen and on a bent one. `r` turns the device a quarter turn, and `h` swipes home.
