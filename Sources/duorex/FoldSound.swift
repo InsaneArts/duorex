@@ -13,6 +13,7 @@ final class FoldSound {
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)
     private var buffers: [DeviceMotion.Sound: AVAudioPCMBuffer] = [:]
     private var isConnected = false
+    private var idle: Timer?
 
     init() {
         isMuted = UserDefaults.standard.bool(forKey: "muted")
@@ -35,6 +36,12 @@ final class FoldSound {
         player.volume = Float(0.2 + 0.4 * strength)
         player.scheduleBuffer(buffer, at: nil, options: .interrupts)
         player.play()
+        // An engine that runs keeps the sound output open and the Mac awake. A second after
+        // the last sound it has nothing left to play.
+        idle?.invalidate()
+        idle = Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.engine.pause() }
+        }
         return true
     }
 
