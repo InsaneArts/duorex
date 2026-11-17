@@ -129,6 +129,8 @@ final class Sim: NSObject, URLSessionDataDelegate {
                 case .picture(let sample): decode(sample)
                 }
             }
+            // The completion handler opens a fresh stream.
+            if stream.isOutOfStep { dataTask.cancel() }
         }
     }
 
