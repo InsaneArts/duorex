@@ -7,31 +7,14 @@ import UniformTypeIdentifiers
 /// Renders one frame to a PNG without opening a window. Used to check the renderer.
 enum Snapshot {
     static func write(scene: DuoScene, pose: Pose, width: Int, height: Int, backdrop: CGColor? = nil, to url: URL) async throws {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb, width: width, height: height, mipmapped: false)
-        descriptor.storageMode = .shared
-        descriptor.usage = [.renderTarget, .shaderRead]
-        guard let texture = scene.device.makeTexture(descriptor: descriptor) else { throw DuoError.render("could not create the snapshot texture") }
-        scene.apply(pose)
-        // The fold rig settles one update after its time changes, so draw a few frames.
-        for _ in 0..<3 {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                do {
-                    try scene.render(into: texture, deltaTime: 1.0 / 60, onComplete: { continuation.resume() })
-                } catch { continuation.resume(throwing: error) }
-            }
-        }
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        texture.getBytes(&bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
-        // RealityRenderer writes Display P3 colors.
-        let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
-        guard let provider = CGDataProvider(data: Data(bytes) as CFData),
-              let space = CGColorSpace(name: CGColorSpace.displayP3),
-              var image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
-                                  space: space, bitmapInfo: info, provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+        guard let frame = Frame(device: scene.device, width: width, height: height) else { throw DuoError.render("could not create the snapshot frame") }
+        try await scene.draw(pose, into: frame)
+        guard var image = frame.image(),
               let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { throw DuoError.render("could not encode the snapshot") }
-        if let backdrop, let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+        if let backdrop, let space = image.colorSpace,
+           let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                   space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
             context.setFillColor(backdrop)
             context.fill(CGRect(x: 0, y: 0, width: width, height: height))
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
