@@ -18,7 +18,8 @@ final class Recorder {
     private var startTime: Double?
     private var lastTime = -Double.infinity
     private var drawing = false
-    private var finished = false
+    /// True from the moment the movie starts to end. No more pictures are taken after that.
+    private var closing = false
 
     init(scene: DuoScene, url: URL, width: Int, height: Int) throws {
         guard let frame = Frame(device: scene.device, width: width, height: height) else { throw DuoError.render("could not create the movie frame") }
@@ -68,7 +69,28 @@ final class Recorder {
     /// Adds the scene, as it is posed now, to the movie. Call it after each change, with the time in seconds.
     /// It keeps to 60 pictures a second and skips a picture while the last one is still drawing.
     func capture(scene: DuoScene, time: Double) {
-        guard !finished, !drawing, time - lastTime >= 1.0 / 61 else { return }
+        guard !closing, !drawing, time - lastTime >= 1.0 / 61 else { return }
+        draw(scene, at: time)
+    }
+
+    /// Ends the movie at `time`, so it lasts as long as the recording did, and writes the file.
+    /// Throws when the file could not be written, as when the disk is full.
+    func finish(scene: DuoScene, time: Double) async throws {
+        guard !closing else { return }
+        closing = true
+        while drawing { try? await Task.sleep(for: .milliseconds(5)) }
+        // One last picture at the end time. Without it the movie would stop at the last change.
+        // A movie's pictures must be in order, so it never comes before the one already taken.
+        draw(scene, at: max(time, lastTime + 1.0 / 60))
+        while drawing { try? await Task.sleep(for: .milliseconds(5)) }
+        input.markAsFinished()
+        await writer.finishWriting()
+        guard writer.status == .completed else {
+            throw DuoError.render("could not write the movie: \(writer.error?.localizedDescription ?? "unknown error")")
+        }
+    }
+
+    private func draw(_ scene: DuoScene, at time: Double) {
         drawing = true
         lastTime = time
         let start = startTime ?? time
@@ -87,25 +109,8 @@ final class Recorder {
         }
     }
 
-    /// Ends the movie at `time`, so it lasts as long as the recording did, and writes the file.
-    /// Throws when the file could not be written, as when the disk is full.
-    func finish(scene: DuoScene, time: Double) async throws {
-        guard !finished else { return }
-        while drawing { try? await Task.sleep(for: .milliseconds(5)) }
-        // One last picture at the end time. Without it the movie would stop at the last change.
-        lastTime = -.infinity
-        capture(scene: scene, time: time)
-        while drawing { try? await Task.sleep(for: .milliseconds(5)) }
-        finished = true
-        input.markAsFinished()
-        await writer.finishWriting()
-        guard writer.status == .completed else {
-            throw DuoError.render("could not write the movie: \(writer.error?.localizedDescription ?? "unknown error")")
-        }
-    }
-
     private func append(at seconds: Double) {
-        guard !finished, input.isReadyForMoreMediaData, let pool = adaptor.pixelBufferPool else { return }
+        guard input.isReadyForMoreMediaData, let pool = adaptor.pixelBufferPool else { return }
         var buffer: CVPixelBuffer?
         CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
         guard let buffer else { return }
