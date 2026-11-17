@@ -37,7 +37,8 @@ final class DuoScene {
     private let surfaces: [Panel: ScreenSurface]
     private let flatBounds: BoundingBox
     private(set) var pose = Pose()
-    private var aspect: Float = 1
+    /// The corners of the two halves as they are folded now, before the device is tilted or turned.
+    private var corners: [SIMD3<Float>] = []
 
     /// A 36 mm sensor behind a 105 mm lens: enough perspective to read as an object, not a diagram.
     private let fieldOfView: Float = 2 * atan(36 / (2 * 105.0)) * 180 / .pi
@@ -157,13 +158,21 @@ final class DuoScene {
         rest.orientation = bisect * simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
         // Keep the folded shape centered: the hinge moves off center as one leaf lifts.
         let half = flatBounds.extents.x / 2
-        let lifted = simd_quatf(angle: raise, axis: [0, 1, 0]).act([-half, 0, 0])
+        let lift = simd_quatf(angle: raise, axis: [0, 1, 0])
+        let lifted = lift.act([-half, 0, 0])
         let xs = [lifted, .zero, SIMD3<Float>(half, 0, 0)].map { bisect.act($0).x }
         rest.position.x = -(xs.min()! + xs.max()!) / 2
+        // Each half is a slab behind its part of the inner screen. The halves meet at the hinge.
+        let thickness = flatBounds.extents.z, height = flatBounds.extents.y
+        let back = SIMD3<Float>(0, 0, -thickness), liftedBack = lift.act(back)
+        let section = [.zero, SIMD3(half, 0, 0), back, SIMD3(half, 0, 0) + back, lifted, liftedBack, lifted + liftedBack]
+        corners = section.flatMap { point in
+            let placed = bisect.act(point + SIMD3(0, 0, thickness / 2)) + SIMD3(rest.position.x, 0, 0)
+            return [placed + SIMD3(0, height / 2, 0), placed - SIMD3(0, height / 2, 0)]
+        }
         orbit.orientation = simd_quatf(angle: Float(pose.yaw * .pi / 180), axis: [0, 1, 0])
             * simd_quatf(angle: Float(pose.pitch * .pi / 180), axis: [1, 0, 0])
             * simd_quatf(angle: Float(pose.roll * .pi / 180), axis: [0, 0, 1])
-        frameCamera()
     }
 
     /// Draws `pose` into `frame`, and returns when the picture is ready.
@@ -178,29 +187,28 @@ final class DuoScene {
 
     /// Draws one frame of the current pose. `onComplete` runs when the picture is ready, on any thread.
     func render(into frame: Frame, onComplete: @escaping @Sendable () -> Void) throws {
-        let newAspect = Float(frame.width) / Float(frame.height)
-        if newAspect != aspect {
-            aspect = newAspect
-            frameCamera()
-        }
+        // Each frame has its own shape, and the camera stands where that shape needs it.
+        camera.position = [0, 0, cameraDistance(aspect: Float(frame.width) / Float(frame.height))]
         try renderer.updateAndRender(deltaTime: 1.0 / 60, cameraOutput: frame.output, onComplete: { _ in onComplete() })
     }
 
-    /// What the scene has under a point of the view. `point` is 0...1 with the origin at the top left.
-    func probe(at point: CGPoint, panel: Panel) -> Probe {
+    /// What the scene has under a point of a view. `point` is 0...1 with the origin at the top left,
+    /// and `aspect` is the view's width over its height.
+    func probe(at point: CGPoint, aspect: Float, panel: Panel) -> Probe {
         let tangent = tan(fieldOfView * .pi / 360)
+        let eye = SIMD3<Float>(0, 0, cameraDistance(aspect: aspect))
         // A button is small, so the pointer only has to be near it. The nearest one wins.
         let overButtons = buttons.worldCenters().map { button, center -> (button: HardwareButton, distance: Float) in
-            let depth = camera.position.z - center.z
+            let depth = eye.z - center.z
             let x = 0.5 + center.x / (depth * tangent * aspect) / 2, y = 0.5 - center.y / (depth * tangent) / 2
             return (button, hypot((x - Float(point.x)) * aspect, y - Float(point.y)))
         }
         // The reach is measured on the device as drawn, so it stays the same part of the frame in any pane.
-        let reach = Self.buttonReach * flatBounds.extents.y / (camera.position.z * tangent * 2)
+        let reach = Self.buttonReach * flatBounds.extents.y / (eye.z * tangent * 2)
         let button = overButtons.filter { $0.distance <= reach }.min { $0.distance < $1.distance }?.button
         guard let surface = surfaces[panel] else { return Probe(button: button) }
         let direction = simd_normalize(SIMD3<Float>((Float(point.x) * 2 - 1) * aspect * tangent, (1 - Float(point.y) * 2) * tangent, -1))
-        let hits = surface.worldLeaves().compactMap { $0.intersect(origin: camera.position, direction: direction) }
+        let hits = surface.worldLeaves().compactMap { $0.intersect(origin: eye, direction: direction) }
         guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }) else { return Probe(button: button) }
         let onScreen = CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y))
         // On the glass the pointer touches the screen, however near a button is.
@@ -209,19 +217,19 @@ final class DuoScene {
                      onFrame: !onGlass && nearest.outside <= Self.frameWidth, button: onGlass ? nil : button)
     }
 
-    /// Backs the camera off until the device, as it is folded and turned now, just fits the view.
-    /// The camera follows a fold or a turn, so the device stays as large as the view allows.
-    private func frameCamera() {
-        let open = Float(min(max(pose.hinge, 0), 180) / 180)
-        let width = flatBounds.extents.x * (0.5 + 0.5 * open), height = flatBounds.extents.y
-        // The box the device covers once it is turned about the view axis.
-        let turn = Float(pose.roll * .pi / 180)
-        let across = abs(cos(turn)) * width + abs(sin(turn)) * height
-        let up = abs(sin(turn)) * width + abs(cos(turn)) * height
+    /// How far back the camera stands for the device to fit a view of this shape.
+    /// Held still, the device has a margin around it, and the camera follows a fold or a turn.
+    /// A strong tilt uses the margin up, and then the camera backs off to keep every corner in view.
+    private func cameraDistance(aspect: Float) -> Float {
         let tangent = tan(fieldOfView * .pi / 360)
-        // The margin leaves room for a tilt. Half folded, a leaf swings toward the camera and looks larger.
-        let margin = 1.22 + 0.16 * sin(open * .pi)
-        camera.position = [0, 0, max(up / 2 / tangent, across / 2 / (tangent * aspect)) * margin]
+        func fit(_ turn: simd_quatf) -> Float {
+            corners.map { corner in
+                let point = turn.act(corner)
+                return point.z + max(abs(point.x) / (tangent * aspect), abs(point.y) / tangent)
+            }.max() ?? 1
+        }
+        let roll = simd_quatf(angle: Float(pose.roll * .pi / 180), axis: [0, 0, 1])
+        return max(fit(roll) * 1.19, fit(orbit.orientation) * 1.07)
     }
 
     /// The joints part of the way from one pose to another.
