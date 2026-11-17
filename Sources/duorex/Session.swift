@@ -91,7 +91,13 @@ final class Session {
             case .hinge(let degrees):
                 sync.userMovedHinge(time: CACurrentMediaTime())
                 sim.fold(to: degrees)
+            case .button(let button, let pressed):
+                sim.send(.button(button, pressed: pressed))
             }
+        }
+        // The buttons are small. Naming the one under the pointer shows where they are.
+        stage.onHover = { [unowned self] button in
+            pane.caption(button.map { "\($0.rawValue) button" } ?? status)
         }
         sim.start()
     }

@@ -73,7 +73,7 @@ final class HardwareButtons {
             // side in the plane of the device is the way in, and it travels most of its height.
             let size = high - low
             let inward: SIMD3<Float> = size.x < size.z ? [bounds.center.x > center.x ? 1 : -1, 0, 0] : [0, 0, bounds.center.z > center.z ? 1 : -1]
-            let travel = inward * min(size.x, size.z) * 0.7
+            let travel = inward * min(size.x, size.z) * 0.6
             let toJoint = joints[skeletonJoint].inverseBindPoseMatrix
             let push = SIMD3(simd_mul(toJoint, SIMD4(travel, 0)).x, simd_mul(toJoint, SIMD4(travel, 0)).y, simd_mul(toJoint, SIMD4(travel, 0)).z)
             buttons[button] = Button(center: center, push: push, joint: joint, skeletonJoint: skeletonJoint)

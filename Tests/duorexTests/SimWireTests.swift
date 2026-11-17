@@ -82,3 +82,15 @@ private func fields(_ message: SimWire.Message) throws -> (tag: UInt8, json: [St
     #expect(turn.tag == 0x07)
     #expect(turn.json["orientation"] as? String == "landscape_left")
 }
+
+@Test func `a button carries its HID usage and whether it went down or came up`() throws {
+    let down = try fields(.button(.cameraControl, pressed: true))
+    #expect(down.tag == 0x04)
+    #expect(down.json["page"] as? Int == 65280)
+    #expect(down.json["usage"] as? Int == 102)
+    #expect(down.json["phase"] as? String == "down")
+    let up = try fields(.button(.volumeUp, pressed: false))
+    #expect(up.json["page"] as? Int == 12)
+    #expect(up.json["usage"] as? Int == 233)
+    #expect(up.json["phase"] as? String == "up")
+}
