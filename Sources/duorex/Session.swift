@@ -111,6 +111,8 @@ final class Session {
                 sim.send(.touch(phase, x: point.x, y: point.y, edge: touchEdge))
             case .scroll(let phase, let point):
                 sim.send(.touch(phase, x: point.x, y: point.y, edge: nil))
+            case .pinch(let phase, let first, let second):
+                sim.send(.pinch(phase, first, second))
             case .hinge(let degrees):
                 sync.userMovedHinge(time: CACurrentMediaTime())
                 sim.fold(to: degrees)
@@ -212,7 +214,7 @@ final class Session {
             }
             switch pointer.kind {
             case .down: stage.pointerDown(at: point, option: pointer.option)
-            case .move, .drag: stage.pointerMoved(to: point)
+            case .move, .drag: stage.pointerMoved(to: point, option: pointer.option)
             case .up: stage.pointerUp(at: point)
             case .wheel(let lines): stage.scroll(at: point, lines: lines)
             }
