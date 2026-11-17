@@ -49,6 +49,7 @@ nonisolated struct Presence {
         latest = (activity, time)
         switch activity {
         case .tap(let point):
+            liftFinger()
             touches.append(Touch(from: point, to: point, seen: time, up: time))
         case .drag(let from, let to, let ended):
             // One finger is told twice: when it starts to move, and when it comes up.
@@ -56,11 +57,18 @@ nonisolated struct Presence {
                 touches[index].to = to
                 if ended { touches[index].up = time }
             } else {
+                liftFinger()
                 touches.append(Touch(from: from, to: to, seen: time, up: ended ? time : nil))
             }
         case .button, .rotate, .other:
             break
         }
+    }
+
+    /// The server follows one finger for a device, and does not always tell that it came up.
+    /// A new touch means that the finger before it is up.
+    private mutating func liftFinger() {
+        touches.removeAll { $0.up == nil }
     }
 
     /// The marks to draw at `time`. Call it at every tick: it also forgets the touches that have faded.
