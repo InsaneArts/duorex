@@ -14,6 +14,8 @@ Drag the frame and the device folds under your pointer. The simulator's hinge fo
 
 `1`, `2` and `3` go to closed, book and open. `[` and `]` move the hinge 10 degrees.
 
+The device makes a sound when it shuts and when it opens flat, louder for a fast fold. `m` turns the sound off.
+
 The frame is thin. When the pointer is on it, the line under the device says `drag to fold`, so you know before you press. A drag from beside the frame turns the device.
 
 ## Touch what you see
@@ -133,6 +135,7 @@ Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and
 - `1` `2` `3` choose closed, book and open. `[` and `]` fold 10 degrees less or more.
 - `r` rotates, `h` goes home, `q` quits.
 - `d` switches dark mode. `+` and `-` change the text size. `s` slows the animations. `w` sends a memory warning.
+- `m` turns the fold sounds off or on.
 - `?` shows the keys, a few at a time.
 
 The first time duorex runs in a terminal, move the pointer over the pane once. That tells duorex where the pane is on screen.
