@@ -123,7 +123,7 @@ enum ContactSheet {
     }
 
     /// Turns a framebuffer picture clockwise by quarter turns, so the interface in it is upright.
-    private static func upright(_ image: CGImage, quarterTurns: Int) -> CGImage {
+    static func upright(_ image: CGImage, quarterTurns: Int) -> CGImage {
         let turns = ((quarterTurns % 4) + 4) % 4
         guard turns != 0 else { return image }
         let width = CGFloat(image.width), height = CGFloat(image.height)

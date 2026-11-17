@@ -30,6 +30,57 @@ final class SimDriver {
         sim.stop()
     }
 
+    /// How the device is now, in a few words for an agent: which screen is lit and its size as
+    /// the interface sees it, the hinge angle, and how the device is held.
+    var summary: String {
+        guard let screen, let panel = litPanel else { return "no picture from the simulator yet" }
+        let turned = interface.quarterTurnsToUpright % 2 == 1
+        let size = turned ? "\(screen.height)x\(screen.width)" : "\(screen.width)x\(screen.height)"
+        let hinge = report?.hingeDegrees.map { "hinge \(Int($0.rounded()))" } ?? "hinge unknown"
+        let held = report?.duoViewOrientation.flatMap(Orientation.init(rawValue:))?.label ?? "upright"
+        return "\(panel.rawValue) screen \(size), \(hinge), held \(held)"
+    }
+
+    // MARK: An agent's hands
+
+    /// Taps the lit screen. `point` is on the screen as it shows upright: x runs right and y
+    /// runs down, each from 0 to 1.
+    func tap(at point: CGPoint) async {
+        let place = interface.framebufferPoint(point)
+        await send(.touch(.begin, x: place.x, y: place.y, edge: nil))
+        try? await Task.sleep(for: .milliseconds(60))
+        await send(.touch(.end, x: place.x, y: place.y, edge: nil))
+    }
+
+    /// Moves a finger across the lit screen in `seconds`. A swipe that starts at the bottom
+    /// edge goes home, as on the device.
+    func swipe(from start: CGPoint, to end: CGPoint, seconds: Double) async {
+        let first = interface.framebufferPoint(start), last = interface.framebufferPoint(end)
+        let edge = interface.homeEdge(atFramebufferPoint: first)
+        let steps = max(Int(seconds * 60), 2)
+        await send(.touch(.begin, x: first.x, y: first.y, edge: edge))
+        for step in 1...steps {
+            try? await Task.sleep(for: .milliseconds(16))
+            let share = Double(step) / Double(steps)
+            await send(.touch(.move, x: first.x + (last.x - first.x) * share, y: first.y + (last.y - first.y) * share, edge: edge))
+        }
+        await send(.touch(.end, x: last.x, y: last.y, edge: edge))
+    }
+
+    /// Presses a hardware button and lets it go.
+    func press(_ button: HardwareButton) async {
+        await send(.button(button, pressed: true))
+        try? await Task.sleep(for: .milliseconds(90))
+        await send(.button(button, pressed: false))
+    }
+
+    /// Sends a message and returns when it is out, so a command that ends next does not cut it off.
+    private func send(_ message: SimWire.Message) async {
+        await withCheckedContinuation { continuation in
+            sim.send(message) { continuation.resume() }
+        }
+    }
+
     /// Connects to the simulator, and returns the pose it is in.
     func connect() async throws -> (hinge: Double, held: Orientation) {
         sim.start()

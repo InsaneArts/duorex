@@ -41,6 +41,33 @@ extension Array {
     }
 }
 
+/// Runs one command of an agent on the simulator: it connects, does the work, and says what
+/// the work says, with how the device is after it.
+func onSimulator(_ work: @escaping (SimDriver) async throws -> String) -> Never {
+    untilDone {
+        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+        let driver = SimDriver(sim: Sim(base: address))
+        _ = try await driver.connect()
+        let said = try await work(driver)
+        print("\(said)  ·  \(driver.summary)")
+        driver.stop()
+    }
+}
+
+/// Opens a duorex pane beside this one, unless one is open or this is not Rex. Returns what it did, in a few words.
+func showPane(device: String) async throws -> String {
+    guard let session = RexHost.session else { return "this is not a Rex pane. Run duorex in a pane to watch." }
+    guard !Panes.isOpen(in: session) else { return "the duorex pane is open" }
+    let binary = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? "duorex"
+    let server = arguments.string("server").map { ["--server", $0] } ?? []
+    _ = try await RexHost.openPane(running: [binary, "--device", device] + server)
+    return "opened a duorex pane beside this one"
+}
+
+func usage(_ text: String) -> DuoError {
+    .terminal("usage: duorex \(text)")
+}
+
 func scene() async throws -> DuoScene {
     let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
     scene.isWireframe = arguments.flag("wireframe")
@@ -81,6 +108,85 @@ case "snapshot":
         } catch { fail(error) }
     }
     dispatchMain()
+case "run":
+    untilDone {
+        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+        let device = address.lastPathComponent
+        let app: AppRunner.App
+        if let path = arguments.string("app") {
+            app = try AppRunner.app(at: path)
+        } else {
+            let folder = URL(fileURLWithPath: arguments.words.first ?? FileManager.default.currentDirectoryPath)
+            app = try await AppRunner.build(in: folder, scheme: arguments.string("scheme"), udid: device) { print($0) }
+        }
+        print("starting \(app.bundleID)")
+        try await AppRunner.start(app, on: device)
+        if !arguments.flag("no-pane") { print(try await showPane(device: device)) }
+        let driver = SimDriver(sim: Sim(base: address))
+        _ = try await driver.connect()
+        _ = await driver.settledScreen()
+        print("running  ·  \(driver.summary)")
+        driver.stop()
+    }
+case "open":
+    untilDone {
+        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+        print(try await showPane(device: address.lastPathComponent))
+    }
+case "screenshot":
+    onSimulator { driver in
+        guard let screen = driver.screen,
+              let image = ScreenShot.image(of: screen, interface: driver.interface, longestSide: arguments.flag("full") ? nil : 1568, grid: arguments.flag("grid"))
+        else { throw DuoError.sim("the simulator sent no picture.") }
+        let out = arguments.string("out").map { URL(fileURLWithPath: $0) } ?? arguments.words.first.map { URL(fileURLWithPath: $0) } ?? ScreenShot.temporaryFile()
+        try ScreenShot.write(image, to: out)
+        return out.path
+    }
+case "tap":
+    onSimulator { driver in
+        guard let point = arguments.numbers(2), point.allSatisfy({ (0...1).contains($0) }) else { throw usage("tap X Y, each from 0 to 1 on the upright screen") }
+        await driver.tap(at: CGPoint(x: point[0], y: point[1]))
+        return "tapped \(point[0]) \(point[1])"
+    }
+case "swipe":
+    onSimulator { driver in
+        guard let points = arguments.numbers(4), points.allSatisfy({ (0...1).contains($0) }) else {
+            throw usage("swipe X1 Y1 X2 Y2 [--seconds 0.25], each from 0 to 1 on the upright screen")
+        }
+        await driver.swipe(from: CGPoint(x: points[0], y: points[1]), to: CGPoint(x: points[2], y: points[3]), seconds: arguments.double("seconds", default: 0.25))
+        return "swiped \(points[0]) \(points[1]) to \(points[2]) \(points[3])"
+    }
+case "home":
+    onSimulator { driver in
+        await driver.swipe(from: CGPoint(x: 0.5, y: 0.985), to: CGPoint(x: 0.5, y: 0.5), seconds: 0.2)
+        return "went home"
+    }
+case "fold":
+    onSimulator { driver in
+        let named = ["shut": 0.0, "closed": 0, "book": 130, "open": 180]
+        guard let word = arguments.words.first, let target = named[word] ?? Double(word), (0...180).contains(target) else {
+            throw usage("fold shut|book|open, or an angle from 0 to 180")
+        }
+        let start = driver.report?.hingeDegrees ?? (driver.litPanel == .cover ? 0 : 180)
+        guard await driver.fold(from: start, to: target) else { throw DuoError.sim("the simulator did not fold to \(Int(target)) degrees.") }
+        _ = await driver.settledScreen()
+        return "folded to \(Int(target))"
+    }
+case "rotate":
+    onSimulator { driver in
+        let named: [String: Orientation] = ["upright": .portrait, "clockwise": .landscapeLeft, "upside-down": .upsideDown, "counterclockwise": .landscapeRight]
+        guard let held = arguments.words.first.flatMap({ named[$0] }) else { throw usage("rotate upright|clockwise|upside-down|counterclockwise") }
+        guard await driver.turn(to: held) else { throw DuoError.sim("the simulator did not turn.") }
+        _ = await driver.settledScreen()
+        return "held \(held.label)"
+    }
+case "press":
+    onSimulator { driver in
+        let named: [String: HardwareButton] = ["power": .power, "volume-up": .volumeUp, "volume-down": .volumeDown, "camera": .cameraControl]
+        guard let button = arguments.words.first.flatMap({ named[$0] }) else { throw usage("press power|volume-up|volume-down|camera") }
+        await driver.press(button)
+        return "pressed \(button.rawValue.lowercased())"
+    }
 case "strobe":
     untilDone {
         let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-strobe.png")
@@ -167,6 +273,29 @@ case "view", "record":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex record [--out movie.mp4] [--size 1920x1080]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex strobe [--out poster.png] [--size 2560x1440]\n       duorex film [--out film.mp4] [--size 1920x1080]\n       duorex update\n       duorex version\n".utf8))
+    FileHandle.standardError.write(Data("""
+    usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light] [--wireframe]
+
+    for an agent:
+      duorex run [folder] [--scheme name] [--app path.app]   build the app, start it, and open the pane
+      duorex screenshot [file.png] [--grid] [--full]         the screen, upright
+      duorex tap X Y                                         X and Y from 0 to 1, as in the screenshot
+      duorex swipe X1 Y1 X2 Y2 [--seconds 0.25]
+      duorex home
+      duorex fold shut|book|open|DEGREES
+      duorex rotate upright|clockwise|upside-down|counterclockwise
+      duorex press power|volume-up|volume-down|camera
+      duorex sweep [--out sheet.png]                         every posture in one picture
+      duorex open                                            only open the pane
+
+    pictures:
+      duorex record [--out movie.mp4] [--size 1920x1080]
+      duorex strobe [--out poster.png] [--size 2560x1440]
+      duorex film [--out film.mp4] [--size 1920x1080]
+
+      duorex update
+      duorex version
+
+    """.utf8))
     exit(2)
 }
