@@ -45,10 +45,12 @@ private func fields(_ message: SimWire.Message) throws -> (tag: UInt8, json: [St
     #expect(stream.read(record(0x7A, [1, 2]) + record(0x03, [9])) == [.picture(Data([9]))])
 }
 
-@Test func `a length no record has drops the stream instead of waiting for it`() {
+@Test func `a length no record has marks the stream as out of step`() {
     var stream = SimWire.Stream()
     #expect(stream.read(Data([0xFF, 0xFF, 0xFF, 0xFF, 0x03, 1, 2])).isEmpty)
-    #expect(stream.read(record(0x03, [9])) == [.picture(Data([9]))])
+    #expect(stream.isOutOfStep)
+    // Nothing after that point can be trusted, wherever the next bytes begin.
+    #expect(stream.read(record(0x03, [9])).isEmpty)
 }
 
 @Test func `the simulator's report decodes`() {
