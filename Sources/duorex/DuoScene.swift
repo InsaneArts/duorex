@@ -26,21 +26,27 @@ final class DuoScene {
     private let orbit = Entity()
     private let rest = Entity()
     private let subject: Entity
-    private let fold: AnimationPlaybackController
+    /// The one skinned mesh the whole device is made of.
+    private let body: ModelEntity
+    /// The joints of the mesh at each step of the fold, from flat to closed. Posing the joints
+    /// from this table, and not from the model's clip, leaves them free for the buttons too.
+    private let foldPoses: [[Transform]]
+    private let buttons: HardwareButtons
     private let camera = PerspectiveCamera()
     private let slots: [Panel: (entity: ModelEntity, material: Int)]
     private let surfaces: [Panel: ScreenSurface]
     private let flatBounds: BoundingBox
     private(set) var pose = Pose()
-    /// True when the last frame drawn does not yet show the pose: one more frame is needed.
-    private(set) var needsSettling = true
-    private var drawnHinge: Double?
     private var aspect: Float = 1
 
     /// A 36 mm sensor behind a 105 mm lens: enough perspective to read as an object, not a diagram.
     private let fieldOfView: Float = 2 * atan(36 / (2 * 105.0)) * 180 / .pi
     /// The fold clip runs from flat to closed over its first five seconds.
     private static let foldClip = (name: "l_over_r", seconds: 5.0)
+    /// The fold is baked in steps of two degrees. Angles in between are blended.
+    private static let foldSteps = 90
+    /// How near the pointer must be to a button to be on it, as a share of the view's height.
+    private static let buttonReach: Float = 0.045
     /// How far past the glass still counts as the frame, in framebuffer units.
     private static let frameWidth: Float = 0.09
     private static let screenMaterials: [Panel: String] = [.cover: "YqugYDOqMSOpqyA", .inner: "CvyXbAGXoolRUYl"]
@@ -98,7 +104,22 @@ final class DuoScene {
         renderer.cameraSettings.antialiasing = .multisample4X
         renderer.cameraSettings.colorBackground = .color(CGColor(red: 0, green: 0, blue: 0, alpha: 0))
 
-        fold = subject.playAnimation(clip, transitionDuration: 0, startsPaused: true)
+        let body = slots[.inner]!.entity
+        self.body = body
+        buttons = try HardwareButtons(entity: body)
+        let playback = subject.playAnimation(clip, transitionDuration: 0, startsPaused: true)
+        var poses: [[Transform]] = []
+        for step in 0...Self.foldSteps {
+            playback.time = Double(step) / Double(Self.foldSteps) * Self.foldClip.seconds
+            // The clip's pose reaches the joints one update after its time changes.
+            try renderer.update(1.0 / 60)
+            try renderer.update(1.0 / 60)
+            poses.append(body.jointTransforms)
+        }
+        // A stopped clip lets go of the joints only at the next update. Until then it undoes a pose set by hand.
+        playback.stop()
+        try renderer.update(1.0 / 60)
+        foldPoses = poses
         for panel in [Panel.cover, .inner] { setScreen(panel, texture: nil) }
         apply(pose)
     }
@@ -128,7 +149,11 @@ final class DuoScene {
         let raise = Float((180 - hinge) * .pi / 180)
         // Turn the device so both leaves face the camera equally while it is partly open.
         let bisect = simd_quatf(angle: -min(raise, Float(hinge * .pi / 180)) / 2, axis: [0, 1, 0])
-        fold.time = (180 - hinge) / 180 * Self.foldClip.seconds
+        let step = (180 - hinge) / 180 * Double(Self.foldSteps)
+        let lower = min(Int(step), Self.foldSteps - 1)
+        var joints = Self.blend(foldPoses[lower], foldPoses[lower + 1], Float(step - Double(lower)))
+        if let press = pose.press { buttons.push(press.button, depth: Float(press.depth), in: &joints) }
+        body.jointTransforms = joints
         rest.orientation = bisect * simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
         // Keep the folded shape centered: the hinge moves off center as one leaf lifts.
         let half = flatBounds.extents.x / 2
@@ -141,42 +166,43 @@ final class DuoScene {
         frameCamera()
     }
 
-    /// Draws `pose` into `frame`, and returns when the picture shows it.
+    /// Draws `pose` into `frame`, and returns when the picture is ready.
     func draw(_ pose: Pose, into frame: Frame) async throws {
         apply(pose)
-        repeat {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                do {
-                    try render(into: frame) { continuation.resume() }
-                } catch { continuation.resume(throwing: error) }
-            }
-        } while needsSettling
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            do {
+                try render(into: frame) { continuation.resume() }
+            } catch { continuation.resume(throwing: error) }
+        }
     }
 
     /// Draws one frame of the current pose. `onComplete` runs when the picture is ready, on any thread.
-    /// Afterwards `needsSettling` says whether the pose needs one more frame.
     func render(into frame: Frame, onComplete: @escaping @Sendable () -> Void) throws {
         let newAspect = Float(frame.width) / Float(frame.height)
         if newAspect != aspect {
             aspect = newAspect
             frameCamera()
         }
-        // The fold rig follows a new hinge angle one frame late.
-        needsSettling = pose.hinge != drawnHinge
-        drawnHinge = pose.hinge
         try renderer.updateAndRender(deltaTime: 1.0 / 60, cameraOutput: frame.output, onComplete: { _ in onComplete() })
     }
 
     /// What the scene has under a point of the view. `point` is 0...1 with the origin at the top left.
     func probe(at point: CGPoint, panel: Panel) -> Probe {
-        guard let surface = surfaces[panel] else { return Probe() }
         let tangent = tan(fieldOfView * .pi / 360)
+        // A button is small, so the pointer only has to be near it. The nearest one wins.
+        let overButtons = buttons.worldCenters().map { button, center -> (button: HardwareButton, distance: Float) in
+            let depth = camera.position.z - center.z
+            let x = 0.5 + center.x / (depth * tangent * aspect) / 2, y = 0.5 - center.y / (depth * tangent) / 2
+            return (button, hypot((x - Float(point.x)) * aspect, y - Float(point.y)))
+        }
+        let button = overButtons.filter { $0.distance <= Self.buttonReach }.min { $0.distance < $1.distance }?.button
+        guard let surface = surfaces[panel] else { return Probe(button: button) }
         let direction = simd_normalize(SIMD3<Float>((Float(point.x) * 2 - 1) * aspect * tangent, (1 - Float(point.y) * 2) * tangent, -1))
         let hits = surface.worldLeaves().compactMap { $0.intersect(origin: camera.position, direction: direction) }
-        guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }) else { return Probe() }
+        guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }) else { return Probe(button: button) }
         let onScreen = CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y))
         return Probe(glass: nearest.outside == 0 ? onScreen : nil, nearest: onScreen,
-                     onFrame: nearest.outside > 0 && nearest.outside <= Self.frameWidth)
+                     onFrame: nearest.outside > 0 && nearest.outside <= Self.frameWidth, button: button)
     }
 
     /// Backs the camera off so the device fills the view at any tilt, and closes in as it folds.
@@ -187,6 +213,15 @@ final class DuoScene {
         let vertical = fieldOfView * .pi / 360
         let narrow = aspect >= 1 ? vertical : atan(tan(vertical) * aspect)
         camera.position = [0, 0, radius * 1.12 / sin(narrow)]
+    }
+
+    /// The joints part of the way from one pose to another.
+    private static func blend(_ from: [Transform], _ to: [Transform], _ amount: Float) -> [Transform] {
+        zip(from, to).map { a, b in
+            Transform(scale: simd_mix(a.scale, b.scale, SIMD3(repeating: amount)),
+                      rotation: simd_slerp(a.rotation, b.rotation, amount),
+                      translation: simd_mix(a.translation, b.translation, SIMD3(repeating: amount)))
+        }
     }
 
     private static func slot(in entity: Entity, material name: String) -> (entity: ModelEntity, material: Int)? {
