@@ -23,10 +23,18 @@ final class Session {
 
     private var quitting = false
 
+    /// The keys, as lines short enough for a narrow pane. "?" shows the next line.
     private var hint: String {
-        stage.recorder == nil ? "drag the frame to fold  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q quit"
-                              : "● recording  ·  1 2 3 poses  ·  r rotate  ·  h home  ·  q stops and saves"
+        [stage.recorder == nil ? "drag frame to fold  ·  1 2 3 poses  ·  ? keys  ·  q quit" : "● recording  ·  ? keys  ·  q stops and saves",
+         "r rotate  ·  h home  ·  d dark  ·  + - text  ·  ? more",
+         "s slow animations  ·  w memory warning  ·  ? back"][hintLine]
     }
+    private var hintLine = 0
+    /// A word about the key that was just pressed. It gives way to the usual line after a moment.
+    private var note: String?
+    private var noteTimer: Timer?
+    /// Whether duorex made the simulator's animations slow.
+    private var slow = false
     /// Hinge angles for the three poses the number keys choose.
     private static let poses: [Character: Double] = ["1": 0, "2": 130, "3": 180]
 
@@ -134,12 +142,35 @@ final class Session {
 
     /// Writes the line under the device: the button under the pointer, or what an agent does, or the status.
     private func caption() {
-        if let hovered {
+        if let note {
+            pane.caption(note)
+        } else if let hovered {
             pane.caption("\(hovered.rawValue) button")
         } else if let activity {
             pane.caption("● agent  ·  \(Presence.words(for: activity, interface: interface))", accent: true)
         } else {
             pane.caption(status)
+        }
+    }
+
+    /// Says what a key did, for a moment.
+    private func tell(_ text: String) {
+        note = text
+        noteTimer?.invalidate()
+        noteTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [unowned self] _ in
+            MainActor.assumeIsolated {
+                note = nil
+                caption()
+            }
+        }
+        caption()
+    }
+
+    /// Changes a setting of the simulator, and says the new value or why it did not change.
+    private func change(_ setting: @escaping (String) async throws -> String) {
+        guard let device = sim?.device else { return }
+        Task {
+            do { tell(try await setting(device)) } catch { tell("\(error)") }
         }
     }
 
@@ -196,6 +227,23 @@ final class Session {
                 let held = sync.userTurned(time: CACurrentMediaTime())
                 stage.rotate(to: held.roll)
                 sim?.send(.rotate(held))
+            case "?":
+                let shown = status == hint
+                hintLine = (hintLine + 1) % 3
+                if shown { show(hint) }
+            case "d":
+                change { "\(try await SimSettings.toggleAppearance(of: $0)) appearance" }
+            case "+", "=", "-":
+                change { "text size: \(try await SimSettings.stepTextSize(of: $0, larger: key != "-"))" }
+            case "s":
+                guard let sim else { break }
+                slow.toggle()
+                sim.send(.slowAnimations(slow))
+                tell("slow animations \(slow ? "on" : "off")")
+            case "w":
+                guard let sim else { break }
+                sim.send(.memoryWarning)
+                tell("memory warning")
             default: break
             }
         case .resized:
