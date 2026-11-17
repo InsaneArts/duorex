@@ -40,6 +40,13 @@ final class DuoScene {
     private(set) var pose = Pose()
     /// How much nearer than its fit the camera stands. A film moves in and out with it.
     var zoom: Float = 1
+    /// True when the device is drawn as lines, with its screens still lit: a drawing of the
+    /// device, not a photo of it.
+    var isWireframe = false {
+        didSet { if isWireframe != oldValue { drawBody() } }
+    }
+    /// The materials of the device as Apple's model has them, to go back to from the lines.
+    private var solidMaterials: [any Material] = []
     /// The corners of the two halves as they are folded now, before the device is tilted or turned.
     private var corners: [SIMD3<Float>] = []
     /// True while the camera frames a set of poses, not the one pose the device is in.
@@ -114,6 +121,7 @@ final class DuoScene {
 
         let body = slots[.inner]!.entity
         self.body = body
+        solidMaterials = body.model?.materials ?? []
         buttons = try HardwareButtons(entity: body)
         markLayer = try MarkLayer()
         renderer.entities.append(markLayer.root)
@@ -152,6 +160,19 @@ final class DuoScene {
             material.color = .init(tint: .black)
         }
         slot.entity.model?.materials[slot.material] = material
+    }
+
+    /// Gives every part of the device but its screens the solid look or the lines.
+    private func drawBody() {
+        guard var model = body.model else { return }
+        let screens = Set(slots.values.filter { $0.entity === body }.map(\.material))
+        var lines = UnlitMaterial(applyPostProcessToneMap: false)
+        lines.color = .init(tint: NSColor(calibratedRed: 0.62, green: 0.86, blue: 1, alpha: 1))
+        lines.triangleFillMode = .lines
+        for index in model.materials.indices where !screens.contains(index) && index < solidMaterials.count {
+            model.materials[index] = isWireframe ? lines : solidMaterials[index]
+        }
+        body.model = model
     }
 
     /// Puts the device in a pose. `marks` are the touches to show on `panel`, the lit screen.
