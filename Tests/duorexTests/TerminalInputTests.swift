@@ -44,3 +44,15 @@ private func bytes(_ text: String) -> [UInt8] { Array(text.utf8) }
     #expect(input.read(bytes("\u{1B}[" + String(repeating: "9", count: 100))).isEmpty)
     #expect(input.read(bytes("q")) == [.key("q")])
 }
+
+@Test func `an Esc key press does not turn the next report into keys`() {
+    var input = TerminalInput()
+    #expect(input.read(bytes("\u{1B}")).isEmpty)
+    #expect(input.read(bytes("\u{1B}[<35;410;22M")) == [.pointer(.init(kind: .move, x: 410, y: 22, option: false))])
+}
+
+@Test func `a key pressed after Esc still counts`() {
+    var input = TerminalInput()
+    #expect(input.read(bytes("\u{1B}")).isEmpty)
+    #expect(input.read(bytes("q")) == [.key("q")])
+}
