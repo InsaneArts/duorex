@@ -89,21 +89,33 @@ final class Sweep {
         return shots
     }
 
-    /// The inner screen as the simulator draws it with the device open. The simulator is
-    /// opened for the picture if it is not open, and put back after.
-    func openScreen() async throws -> CGImage {
+    /// The lit screen as the simulator draws it at each of some hinge angles, held upright.
+    /// The simulator is folded and turned for the pictures, and put back after.
+    func screens(at hinges: [Double]) async throws -> [CGImage] {
         let start = try await connect()
-        var screen: CGImage?
-        if await fold(from: start.hinge, to: 180) {
-            if start.hinge < 180 { try? await Task.sleep(for: .milliseconds(900)) }
-            _ = await wait(seconds: 5) { frame.flatMap(Self.image).map { !Self.isBlank($0) } ?? false }
-            screen = frame.flatMap(Self.image)
+        var screens: [CGImage] = []
+        var hinge = start.hinge
+        if await turn(to: .portrait) {
+            for target in hinges {
+                let moved = hinge != target
+                guard await fold(from: hinge, to: target) else { break }
+                hinge = target
+                // The interface lays out again after a fold. A panel that just came on is black until the app draws on it.
+                if moved { try? await Task.sleep(for: .milliseconds(900)) }
+                _ = await wait(seconds: 5) { frame.flatMap(Self.image).map { !Self.isBlank($0) } ?? false }
+                guard !Task.isCancelled, let screen = frame.flatMap(Self.image) else { break }
+                screens.append(screen)
+            }
         }
-        await Task { _ = await fold(from: 180, to: start.hinge) }.value
+        let from = hinge
+        await Task {
+            _ = await turn(to: start.held)
+            _ = await fold(from: from, to: start.hinge)
+        }.value
         sim.stop()
         try Task.checkCancellation()
-        guard let screen else { throw DuoError.sim("the simulator did not open for the picture.") }
-        return screen
+        guard screens.count == hinges.count else { throw DuoError.sim("the simulator did not fold for the pictures.") }
+        return screens
     }
 
     /// Connects to the simulator, and returns the pose it is in.

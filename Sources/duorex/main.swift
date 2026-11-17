@@ -109,7 +109,7 @@ case "strobe":
         if !arguments.flag("pattern") {
             // The picture shows the app as it is on the open device, on every exposure.
             let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-            let screen = try await Sweep(sim: Sim(base: address), scene: scene).openScreen()
+            let screen = try await Sweep(sim: Sim(base: address), scene: scene).screens(at: [180])[0]
             scene.setScreen(.inner, texture: try await TextureResource(image: screen, options: .init(semantic: .color)))
         }
         try await Strobe.write(scene: scene, width: size[0], height: size[1], to: out)
