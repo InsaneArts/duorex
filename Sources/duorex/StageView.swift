@@ -119,9 +119,9 @@ final class StageView: NSView {
         send(motion.pointerDown(at: point, option: option) { probe($0) })
     }
 
-    func pointerMoved(to point: CGPoint) {
+    func pointerMoved(to point: CGPoint, option: Bool) {
         let hovered = motion.hoveredButton
-        send(motion.pointerMoved(to: point) { probe($0) })
+        send(motion.pointerMoved(to: point, option: option) { probe($0) })
         if motion.hoveredButton != hovered { onHover?(motion.hoveredButton) }
     }
 
@@ -158,7 +158,8 @@ final class StageView: NSView {
         let step = motion.step(to: now)
         step.effects.forEach { onEffect?($0) }
         if step.moving { setNeedsRender() }
-        let marks = presence.step(to: now)
+        // Another client's touches, and under them the user's own two fingers in a pinch.
+        let marks = motion.fingers.map { Mark(point: $0, radius: Presence.radius, opacity: 1, look: .finger) } + presence.step(to: now)
         if marks != self.marks {
             self.marks = marks
             setNeedsRender()

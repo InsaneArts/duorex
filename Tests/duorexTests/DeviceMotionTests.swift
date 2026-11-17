@@ -179,3 +179,59 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     #expect(motion.pointerDown(at: CGPoint(x: 500, y: 300), option: false, probe: probe)
         == [.touch(.end, CGPoint(x: 0.75, y: 0.5)), .touch(.begin, CGPoint(x: 0.75, y: 0.5))])
 }
+
+// MARK: Pinch
+
+@Test func `an Option-press on the glass is a pinch: two fingers, mirrored about the middle of the screen`() {
+    var motion = motion()
+    let first = CGPoint(x: 0.25, y: 0.25), second = CGPoint(x: 1 - 0.25, y: 1 - 0.25)
+    #expect(motion.pointerDown(at: CGPoint(x: 300, y: 225), option: true, probe: probe) == [.pinch(.begin, first, second)])
+    #expect(motion.fingers == [first, second])
+    let inFirst = CGPoint(x: 0.4, y: 0.4), inSecond = CGPoint(x: 1 - 0.4, y: 1 - 0.4)
+    #expect(motion.pointerMoved(to: CGPoint(x: 360, y: 270), probe: probe) == [.pinch(.move, inFirst, inSecond)])
+    #expect(motion.fingers == [inFirst, inSecond])
+    #expect(motion.pointerUp(at: CGPoint(x: 360, y: 270), probe: probe) == [.pinch(.end, inFirst, inSecond)])
+    #expect(motion.fingers.isEmpty)
+    #expect(!motion.isDragging)
+    // A pinch is not a fold.
+    #expect(motion.pose.hinge == 180)
+}
+
+@Test func `a pinch that leaves the glass stays on its edge`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    #expect(motion.pointerMoved(to: CGPoint(x: 100, y: 300), probe: probe) == [.pinch(.move, CGPoint(x: 0, y: 0.5), CGPoint(x: 1, y: 0.5))])
+}
+
+@Test func `an Option-press off the glass still folds`() {
+    var motion = motion()
+    // On the background, far from the device.
+    #expect(motion.pointerDown(at: CGPoint(x: 60, y: 300), option: true, probe: probe).isEmpty)
+    _ = motion.pointerMoved(to: CGPoint(x: 260, y: 300), probe: probe)
+    #expect(motion.pose.hinge < 180)
+    #expect(motion.fingers.isEmpty)
+}
+
+@Test func `with Option held, a resting pointer shows where the two fingers would go`() {
+    var motion = motion()
+    _ = motion.pointerMoved(to: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    #expect(motion.fingers == [CGPoint(x: 0.25, y: 0.25), CGPoint(x: 1 - 0.25, y: 1 - 0.25)])
+    // Off the glass, and without Option, there is nothing to show.
+    _ = motion.pointerMoved(to: CGPoint(x: 60, y: 300), option: true, probe: probe)
+    #expect(motion.fingers.isEmpty)
+    _ = motion.pointerMoved(to: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    _ = motion.pointerMoved(to: CGPoint(x: 301, y: 225), probe: probe)
+    #expect(motion.fingers.isEmpty)
+    _ = motion.pointerMoved(to: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    motion.pointerLeft()
+    #expect(motion.fingers.isEmpty)
+}
+
+@Test func `the fingers shown for a resting pointer go away when a press begins somewhere else`() {
+    var motion = motion()
+    _ = motion.pointerMoved(to: CGPoint(x: 300, y: 225), option: true, probe: probe)
+    #expect(motion.fingers.count == 2)
+    // The press lands on the background before any report of the move there.
+    _ = motion.pointerDown(at: CGPoint(x: 60, y: 300), option: true, probe: probe)
+    #expect(motion.fingers.isEmpty)
+}
