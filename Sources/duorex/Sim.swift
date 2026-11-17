@@ -1,20 +1,26 @@
 import CoreMedia
 import Foundation
+import QuartzCore
 import VideoToolbox
 
-/// One simulator served by serve-sim: its live screen and its input.
-/// The bytes on both connections are `SimWire`'s; this type owns the connections and the decoder.
+/// One simulator served by serve-sim: its live screen, its input, and what its other clients do.
+/// The bytes on the connections are `SimWire`'s; this type owns the connections and the decoder.
 final class Sim: NSObject, URLSessionDataDelegate {
     /// A decoded picture of the lit panel.
     var onFrame: ((CVPixelBuffer) -> Void)?
     /// The simulator's pose changed, or it reported it for the first time.
     var onReport: ((SimWire.Report) -> Void)?
+    /// Another client of the server did something to the simulator. Most of the time it is an agent.
+    var onActivity: ((SimWire.Activity) -> Void)?
 
     private let base: URL
     private var session: URLSession!
     private var streamTask: URLSessionDataTask?
     private var socket: URLSessionWebSocketTask?
     private var stream = SimWire.Stream()
+    private var eventsTask: URLSessionDataTask?
+    private var events = SimWire.Events()
+    private var sent = SimWire.Sent()
     private var format: CMVideoFormatDescription?
     private var decoder: VTDecompressionSession?
     private var stopped = false
@@ -34,11 +40,13 @@ final class Sim: NSObject, URLSessionDataDelegate {
     func start() {
         openStream()
         openSocket()
+        openEvents()
     }
 
     func stop() {
         stopped = true
         streamTask?.cancel()
+        eventsTask?.cancel()
         socket?.cancel(with: .goingAway, reason: nil)
         if let decoder { VTDecompressionSessionInvalidate(decoder) }
     }
@@ -46,6 +54,7 @@ final class Sim: NSObject, URLSessionDataDelegate {
     // MARK: Input
 
     func send(_ message: SimWire.Message) {
+        sent.note(message, time: CACurrentMediaTime())
         socket?.send(.data(message.data)) { error in
             if let error { log.error("input: \(error.localizedDescription, privacy: .public)") }
         }
@@ -97,7 +106,7 @@ final class Sim: NSObject, URLSessionDataDelegate {
                 case .success:
                     self.receive(on: socket)
                 case .failure:
-                    self.reconnect(socket: true)
+                    self.retry { $0.openSocket() }
                 }
             }
         }
@@ -112,16 +121,34 @@ final class Sim: NSObject, URLSessionDataDelegate {
         streamTask?.resume()
     }
 
+    /// The event log is the server's, not the device's: it is at the server's root, and names the device.
+    private func openEvents() {
+        guard !stopped, var components = URLComponents(url: base.deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("api/event-log/events"), resolvingAgainstBaseURL: false) else { return }
+        // The stream starts with the events of the past. One is the fewest the server sends.
+        components.queryItems = [URLQueryItem(name: "device", value: base.lastPathComponent), URLQueryItem(name: "limit", value: "1")]
+        events = SimWire.Events()
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 3600 * 24
+        eventsTask = session.dataTask(with: request)
+        eventsTask?.resume()
+    }
+
     /// Opens a dropped connection again after a pause, as when the simulator restarts.
-    private func reconnect(socket: Bool) {
+    private func retry(_ open: @escaping @MainActor (Sim) -> Void) {
         guard !stopped else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            if socket { self?.openSocket() } else { self?.openStream() }
+            if let self { open(self) }
         }
     }
 
     nonisolated func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         MainActor.assumeIsolated {
+            if dataTask === eventsTask {
+                let now = CACurrentMediaTime()
+                for activity in events.read(data) where !sent.claims(activity, time: now) { onActivity?(activity) }
+                return
+            }
             guard dataTask === streamTask else { return }
             for record in stream.read(data) {
                 switch record {
@@ -136,8 +163,12 @@ final class Sim: NSObject, URLSessionDataDelegate {
 
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         MainActor.assumeIsolated {
-            guard task === streamTask else { return }
-            reconnect(socket: false)
+            if task === eventsTask {
+                // A server without an event log never gets one. Any other end is a dropped connection.
+                if (task.response as? HTTPURLResponse)?.statusCode != 404 { retry { $0.openEvents() } }
+            } else if task === streamTask {
+                retry { $0.openStream() }
+            }
         }
     }
 
