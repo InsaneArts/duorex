@@ -9,22 +9,27 @@ private let paneSize = CGSize(width: 1061, height: 1176)
 private let layout = PaneLocator.Layout(windowSize: CGSize(width: 2530, height: 1260), paneSize: paneSize,
                                         rect: CGRect(x: 0.5, y: 0, width: 0.5, height: 1))
 
-/// Feeds a locator the report a terminal sends for a pointer at `pointer`, in window coordinates.
+/// Feeds a locator the report a terminal sends for a pointer at `reported`, in window coordinates.
 /// Like Rex, the terminal keeps reporting when the pointer leaves the pane, clamped to the pane.
-private func report(_ locator: inout PaneLocator, pointer: CGPoint, time: Double) {
-    let local = CGPoint(x: min(max(pointer.x - paneOrigin.x, 0), paneSize.width),
-                        y: min(max(pointer.y - paneOrigin.y, 0), paneSize.height))
-    if locator.wants(local: local, pointer: pointer, time: time) {
-        _ = locator.measure(CGPoint(x: pointer.x - local.x, y: pointer.y - local.y))
-    }
+/// `pointer` is where the pointer is on screen when the report is read: the same place, or further on.
+private func report(_ locator: inout PaneLocator, at reported: CGPoint, pointer: CGPoint? = nil, time: Double, from origin: CGPoint = paneOrigin) {
+    let local = CGPoint(x: min(max(reported.x - origin.x, 0), paneSize.width),
+                        y: min(max(reported.y - origin.y, 0), paneSize.height))
+    locator.reported(local: local, pointer: pointer ?? reported, time: time)
+}
+
+/// Looks for the pane the way the dock does at each tick, with the pointer at `pointer` on screen.
+private func look(_ locator: inout PaneLocator, pointer: CGPoint, time: Double) {
+    guard let local = locator.restingReport(pointer: pointer, time: time) else { return }
+    _ = locator.measure(CGPoint(x: pointer.x - local.x, y: pointer.y - local.y))
 }
 
 /// A locator that has found the pane from a pointer resting inside it.
 private func locatedPane() -> PaneLocator {
     var locator = PaneLocator()
     locator.update(layout)
-    report(&locator, pointer: CGPoint(x: 1700, y: 300), time: 0)
-    report(&locator, pointer: CGPoint(x: 1700.5, y: 300), time: 0.016)
+    report(&locator, at: CGPoint(x: 1700, y: 300), time: 0)
+    look(&locator, pointer: CGPoint(x: 1700, y: 300), time: 0.1)
     return locator
 }
 
@@ -37,25 +42,41 @@ private func locatedPane() -> PaneLocator {
     // The pointer drifts left into the next pane, one point per report.
     var time = 1.0
     for x in stride(from: 1470.0, through: 370, by: -1) {
-        report(&locator, pointer: CGPoint(x: x, y: 300), time: time)
+        report(&locator, at: CGPoint(x: x, y: 300), time: time)
+        look(&locator, pointer: CGPoint(x: x, y: 300), time: time)
         time += 0.016
     }
+    // It stops there.
+    look(&locator, pointer: CGPoint(x: 370, y: 300), time: time + 1)
     #expect(locator.origin == paneOrigin)
 }
 
 @Test func `a pointer that comes back after a long drag outside does not move the pane`() {
     var locator = locatedPane()
-    report(&locator, pointer: CGPoint(x: 400, y: 300), time: 1)
-    report(&locator, pointer: CGPoint(x: 400.2, y: 300), time: 1.016)
+    report(&locator, at: CGPoint(x: 400, y: 300), time: 1)
+    look(&locator, pointer: CGPoint(x: 400, y: 300), time: 1.1)
     #expect(locator.origin == paneOrigin)
 }
 
-@Test func `a fast pointer is not trusted`() {
+@Test func `a moving pointer is not trusted`() {
     var locator = PaneLocator()
     locator.update(layout)
-    // Reports lag a fast pointer, so the first ones would place the pane wrongly.
-    report(&locator, pointer: CGPoint(x: 1600, y: 300), time: 0)
-    report(&locator, pointer: CGPoint(x: 1680, y: 300), time: 0.016)
+    // Reports lag a moving pointer, so they would place the pane wrongly.
+    var time = 0.0
+    for x in stride(from: 1600.0, through: 1700, by: 2) {
+        report(&locator, at: CGPoint(x: x, y: 300), pointer: CGPoint(x: x + 3, y: 300), time: time)
+        look(&locator, pointer: CGPoint(x: x + 3, y: 300), time: time)
+        time += 0.016
+    }
+    #expect(locator.origin == nil)
+}
+
+@Test func `a pointer that moved on where the terminal does not see it is not trusted`() {
+    var locator = PaneLocator()
+    locator.update(layout)
+    // The last report is from inside the pane. The pointer then rests on a window in front of it.
+    report(&locator, at: CGPoint(x: 1700, y: 300), time: 0)
+    look(&locator, pointer: CGPoint(x: 1740, y: 300), time: 0.5)
     #expect(locator.origin == nil)
 }
 
@@ -70,12 +91,8 @@ private func locatedPane() -> PaneLocator {
     #expect(!locator.isMeasured)
     // The prediction was off by three points. A pointer resting in the pane corrects it.
     let pointer = CGPoint(x: 1500, y: 300)
-    for step in 0..<2 {
-        let local = CGPoint(x: pointer.x - (paneOrigin.x - 197), y: pointer.y - paneOrigin.y)
-        if locator.wants(local: local, pointer: pointer, time: 5 + Double(step) * 0.016) {
-            _ = locator.measure(CGPoint(x: pointer.x - local.x, y: pointer.y - local.y))
-        }
-    }
+    report(&locator, at: pointer, time: 5, from: CGPoint(x: paneOrigin.x - 197, y: paneOrigin.y))
+    look(&locator, pointer: pointer, time: 5.2)
     #expect(locator.origin == CGPoint(x: paneOrigin.x - 197, y: paneOrigin.y))
     #expect(locator.isMeasured)
 }
@@ -101,4 +118,17 @@ private func locatedPane() -> PaneLocator {
     var locator = locatedPane()
     locator.update(layout)
     #expect(locator.isMeasured)
+}
+
+@Test func `reports from a moving pointer do not move the pane`() {
+    var locator = locatedPane()
+    // The pointer crosses the pane. Three of its reports are read together, when the pointer
+    // on screen has already moved on.
+    let pointer = CGPoint(x: 1708, y: 300)
+    for x in [1700.0, 1703, 1706] {
+        report(&locator, at: CGPoint(x: x, y: 300), pointer: pointer, time: 1)
+        look(&locator, pointer: pointer, time: 1)
+    }
+    look(&locator, pointer: pointer, time: 1.016)
+    #expect(locator.origin == paneOrigin)
 }
