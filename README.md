@@ -72,6 +72,17 @@ duorex strobe --out poster.png --size 3840x2160
 
 The picture shows the app as it is on the open device. If the simulator is shut, duorex opens it for the picture and puts it back.
 
+## Make a film
+
+`duorex film` makes a ten-second movie with no hand on the device. It turns while it is shut, opens as it comes round to the front, the camera moves in on your app, and it folds to a book.
+
+```sh
+duorex film                                    # saves duorex-film.mp4, 1920 by 1080
+duorex film --out launch.mp4 --size 1080x1080
+```
+
+duorex first takes three pictures of your app from the simulator: shut, open and half open. Then it draws the film at its own pace, so each of its 600 pictures is in the movie. The whole run takes about 20 seconds, and the simulator is put back.
+
 ## It stays in its pane
 
 duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
