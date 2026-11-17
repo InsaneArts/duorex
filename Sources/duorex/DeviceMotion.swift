@@ -23,7 +23,15 @@ nonisolated struct DeviceMotion {
         case begin, move, end
     }
 
-    /// Something the motion asks of the simulator.
+    /// The sound the device makes when its two halves stop.
+    enum Sound: Equatable {
+        /// It shut.
+        case shut
+        /// It opened flat.
+        case flat
+    }
+
+    /// Something the motion asks for: of the simulator, most of the time.
     enum Effect: Equatable {
         /// A finger on the lit screen, at a framebuffer point.
         case touch(TouchPhase, CGPoint)
@@ -35,6 +43,8 @@ nonisolated struct DeviceMotion {
         case hinge(Double)
         /// The user pressed a hardware button, or let it go.
         case button(HardwareButton, pressed: Bool)
+        /// The device shut or opened flat. `strength` is how hard it arrived, from 0 to 1.
+        case sound(Sound, strength: Double)
     }
 
     private enum Grab {
@@ -70,6 +80,12 @@ nonisolated struct DeviceMotion {
     /// False while the hinge follows the simulator, so that motion is not sent back to it.
     private var userOwnsHinge = true
     private var time = 0.0
+    /// The end the hinge is at, or nil when it is between the two. The hinge starts flat.
+    private var hingeEnd: Sound? = .flat
+    private var lastHinge = 180.0
+    /// How fast the hinge moved a moment ago, in degrees a second. A spring slows down before
+    /// it arrives, so its speed at the end says little about how hard the fold was.
+    private var hingeSpeed = 0.0
     /// True while the device turns back to the front from far away.
     private var comingBack = false
 
@@ -109,7 +125,15 @@ nonisolated struct DeviceMotion {
         // Not while the pointer holds the device: it would move under the finger.
         guard case .none = grab else { return }
         userOwnsHinge = false
-        if animated { hinge.target = degrees } else { hinge.hold(degrees) }
+        if animated {
+            hinge.target = degrees
+        } else {
+            // The device takes the angle at once, as at the start. It did not move there, so it makes no sound.
+            hinge.hold(degrees)
+            hingeEnd = Self.end(at: degrees)
+            lastHinge = degrees
+            hingeSpeed = 0
+        }
         reportedHinge = degrees
     }
 
@@ -261,6 +285,16 @@ nonisolated struct DeviceMotion {
             pitch.damping = Self.bounce
         }
         let moving = [turning, hinge.step(elapsed), roll.step(elapsed), press.step(elapsed)].contains(true)
+        // The halves stop when the hinge comes to an end. Near an end, they stay there for the ear:
+        // the hinge must leave by some degrees before it can arrive again.
+        hingeSpeed = max(abs(hinge.value - lastHinge) / elapsed, hingeSpeed * exp(-elapsed / 0.3))
+        lastHinge = hinge.value
+        if let end = Self.end(at: hinge.value) {
+            if end != hingeEnd { effects.append(.sound(end, strength: min(max(hingeSpeed / 400, 0.15), 1))) }
+            hingeEnd = end
+        } else if hinge.value > 8, hinge.value < 172 {
+            hingeEnd = nil
+        }
         if press.value == 0, press.target == 0 { pushed = nil }
         if userOwnsHinge, abs(hinge.value - reportedHinge) >= 0.5 || (!moving && hinge.value != reportedHinge) {
             reportedHinge = hinge.value
@@ -273,6 +307,11 @@ nonisolated struct DeviceMotion {
         guard wheel != nil else { return [] }
         wheel = nil
         return lastTouch.map { [.scroll(.end, $0)] } ?? []
+    }
+
+    /// The end of the hinge's way that an angle is at, if it is at one.
+    private static func end(at degrees: Double) -> Sound? {
+        degrees <= 1 ? .shut : degrees >= 179 ? .flat : nil
     }
 
     /// The two fingers of a pinch with one of them at `point`, a framebuffer point.

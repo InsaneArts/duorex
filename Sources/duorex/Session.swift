@@ -7,6 +7,7 @@ final class Session {
     private let dock: Dock
     private let feed: ScreenFeed
     private let rex: RexHost?
+    private let sound = FoldSound()
     private var sim: Sim?
     private var sync = PoseSync()
     private var signals: [DispatchSourceSignal] = []
@@ -27,7 +28,7 @@ final class Session {
     private var hint: String {
         [stage.recorder == nil ? "drag frame to fold  ·  1 2 3 poses  ·  ? keys  ·  q quit" : "● recording  ·  ? keys  ·  q stops and saves",
          "r rotate  ·  h home  ·  d dark  ·  + - text  ·  ? more",
-         "s slow animations  ·  w memory warning  ·  ? back"][hintLine]
+         "s slow  ·  w memory warning  ·  m sound  ·  ? back"][hintLine]
     }
     private var hintLine = 0
     /// A word about the key that was just pressed. It gives way to the usual line after a moment.
@@ -118,6 +119,9 @@ final class Session {
                 sim.fold(to: degrees)
             case .button(let button, let pressed):
                 sim.send(.button(button, pressed: pressed))
+            case .sound(let sound, let strength):
+                let played = self.sound.play(sound, strength: strength)
+                log.debug("sound: \(String(describing: sound), privacy: .public) \(strength, format: .fixed(precision: 2)) played \(played)")
             }
         }
         // The buttons are small and the frame is thin. The line says what a press there takes hold of.
@@ -250,6 +254,9 @@ final class Session {
                 guard let sim else { break }
                 sim.send(.memoryWarning)
                 tell("memory warning")
+            case "m":
+                sound.isMuted.toggle()
+                tell(sound.isMuted ? "sound off" : "sound on")
             default: break
             }
         case .resized:
