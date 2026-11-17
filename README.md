@@ -18,6 +18,8 @@ Drag the frame and the device folds under your pointer. The simulator's hinge fo
 
 Click, drag and scroll on either screen. The touch lands where you point, on a flat screen and on a bent one. `r` turns the device a quarter turn, and `h` swipes home.
 
+Hold Option and drag on a screen to pinch. The pointer is one finger, and the other mirrors it about the middle of the screen. Both show as pale spots, also before you press.
+
 Drag the background to tilt the device. It springs back when you let go.
 
 ## Press its buttons
@@ -122,7 +124,8 @@ xcrun simctl delete "duorex Duo"
 Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and starts serve-sim for it, which takes about 30 seconds. Later runs attach to the running server.
 
 - Click or drag on a screen to touch it. Scroll to scroll.
-- Drag the frame to fold. Option-drag folds from anywhere.
+- Drag the frame to fold. Option-drag off the screen folds from anywhere.
+- Option-drag on a screen pinches.
 - Click a button on the frame to press it.
 - Drag the background to tilt.
 - `1` `2` `3` choose closed, book and open. `[` and `]` fold 10 degrees less or more.
