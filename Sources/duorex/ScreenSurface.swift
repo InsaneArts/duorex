@@ -29,11 +29,6 @@ nonisolated struct ScreenLeaf {
         return (clamped, distance, simd_distance(uv, clamped))
     }
 
-    /// Whether a framebuffer point is on this leaf's part of the screen.
-    func shows(_ uv: SIMD2<Float>) -> Bool {
-        uv.x >= region.x && uv.y >= region.y && uv.x <= region.x + region.z && uv.y <= region.y + region.w
-    }
-
     /// Where a framebuffer point lies on this leaf's plane. `across` and `down` are the ways the
     /// framebuffer's x and y run there, each as long as the whole framebuffer.
     func place(_ uv: SIMD2<Float>) -> (point: SIMD3<Float>, across: SIMD3<Float>, down: SIMD3<Float>) {
