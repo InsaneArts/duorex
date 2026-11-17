@@ -64,7 +64,7 @@ npx serve-sim tap 0.5 0.4    # a point on the screen, from 0 to 1
 npx serve-sim fold 130
 ```
 
-When the agent folds the device, the one in your pane folds too.
+When the agent folds the device, the one in your pane folds too. The agent can also run `duorex sweep` and read the sheet, to check its own work in every posture.
 
 ## Install
 
