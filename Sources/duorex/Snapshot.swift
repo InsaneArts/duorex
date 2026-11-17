@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 /// Renders one frame to a PNG without opening a window. Used to check the renderer.
 enum Snapshot {
-    static func write(scene: DuoScene, pose: DuoScene.Pose, width: Int, height: Int, backdrop: CGColor? = nil, to url: URL) async throws {
+    static func write(scene: DuoScene, pose: Pose, width: Int, height: Int, backdrop: CGColor? = nil, to url: URL) async throws {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb, width: width, height: height, mipmapped: false)
         descriptor.storageMode = .shared
         descriptor.usage = [.renderTarget, .shaderRead]

@@ -7,8 +7,8 @@ final class ScreenFeed {
     private let scene: DuoScene
     private let queue: MTLCommandQueue
     private let cache: CVMetalTextureCache
-    private var screens: [DuoScene.Panel: (texture: LowLevelTexture, resource: TextureResource, width: Int, height: Int)] = [:]
-    private var lit: Set<DuoScene.Panel> = []
+    private var screens: [Panel: (texture: LowLevelTexture, resource: TextureResource, width: Int, height: Int)] = [:]
+    private var lit: Set<Panel> = []
 
     init(scene: DuoScene) throws {
         self.scene = scene
@@ -19,22 +19,17 @@ final class ScreenFeed {
         self.queue = queue
     }
 
-    /// The simulator streams whichever panel is on. The cover has fewer pixels than the inner screen.
-    static func panel(width: Int, height: Int) -> DuoScene.Panel {
-        width * height < 4_000_000 ? .cover : .inner
-    }
-
     /// Turns a screen dark, as the real device does with the panel that is not in use.
-    func turnOff(_ panel: DuoScene.Panel) {
+    func turnOff(_ panel: Panel) {
         guard lit.remove(panel) != nil else { return }
         scene.setScreen(panel, texture: nil)
     }
 
     /// Copies a frame to its screen and returns the panel it belongs to.
     @discardableResult
-    func show(_ frame: CVPixelBuffer) -> DuoScene.Panel? {
+    func show(_ frame: CVPixelBuffer) -> Panel? {
         let width = CVPixelBufferGetWidth(frame), height = CVPixelBufferGetHeight(frame)
-        let panel = Self.panel(width: width, height: height)
+        let panel = Panel(framebufferWidth: width, height: height)
         var wrapped: CVMetalTexture?
         CVMetalTextureCacheCreateTextureFromImage(nil, cache, frame, nil, .bgra8Unorm_srgb, width, height, 0, &wrapped)
         guard let wrapped, let source = CVMetalTextureGetTexture(wrapped), let commands = queue.makeCommandBuffer() else { return nil }
