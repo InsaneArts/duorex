@@ -1,81 +1,113 @@
-# duorex
+<h1 align="center">duorex</h1>
 
-An interactive 3D iPhone Duo in a Rex pane. The device is Apple's own model from Xcode, the
-screens are the live simulator, and you fold it by dragging its frame.
+<h3 align="center">A real iPhone Duo in your terminal pane.</h3>
 
-duorex runs inside the pane as a terminal program. It draws the device in a click-through
-window that sits over the pane and follows it. Rex keeps the pointer and the keyboard, so the
-pane focuses, splits, and closes like any other pane.
+duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. The device is Apple's own model from Xcode, and its screens are the live simulator. You fold it with your pointer, and your agent can use the same device while you watch.
 
-## Requirements
+## Fold it like the real thing
 
-- macOS 15 or later on Apple silicon
-- Xcode 27.1 or later with an iOS 27.1 or later simulator runtime
-- Node.js, for [serve-sim](https://github.com/EvanBacon/serve-sim)
-- A terminal that reports the pointer in pixels (SGR mode 1016): Rex, Ghostty
+Drag the frame and the device folds under your pointer. The simulator's hinge follows, so your app lays out again as the angle changes. Let go anywhere between closed and flat and it stays there.
+
+`1`, `2` and `3` go to closed, book and open. `[` and `]` move the hinge 10 degrees.
+
+## Touch what you see
+
+Click, drag and scroll on either screen. The touch lands where you point, on a flat screen and on a bent one. `r` turns the device a quarter turn, and `h` swipes home.
+
+Drag the background to tilt the device. It springs back when you let go.
+
+## It stays in its pane
+
+duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
+
+Move the Rex window or change the layout and the device follows. Switch to another tab and it hides.
+
+## Your agent uses the same device
+
+duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve-sim), so an agent in the next pane can drive it from the shell while you watch:
+
+```sh
+npx serve-sim tap 0.5 0.4 -d "duorex Duo"    # a point on the screen, from 0 to 1
+npx serve-sim fold 130 -d "duorex Duo"
+```
+
+When the agent folds the device, the one in your pane folds too.
 
 ## Install
 
 ```sh
-swift build -c release
-cp .build/release/duorex ~/.local/bin/
+curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
 ```
 
-For a Rex action, copy `rex/duorex.lua` to `~/.config/rex/` and add this to `init.lua`:
+The installer builds duorex from source and puts it in `~/.local/bin`.
+
+Requirements:
+
+- A Mac with Apple silicon, on macOS 15 or newer
+- Xcode 27.1 or newer, with an iOS 27.1 or newer simulator runtime
+- Node.js, for serve-sim
+- Rex, or another terminal that reports the pointer in pixels, such as Ghostty
+
+To open the device with a key in Rex, load the action from `~/.config/rex/init.lua`. The installer puts it in `~/.config/rex/duorex.lua`:
 
 ```lua
 require("duorex")
 rex.bind("ctrl+p>i", "duorex")
 ```
 
-## Use
+To update:
 
-Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and starts
-serve-sim for it. That takes about 30 seconds. Later runs attach to the running server.
+```sh
+duorex update
+```
 
-| Input | Effect |
-|---|---|
-| Click or drag on a screen | Touch |
-| Scroll on a screen | Scroll |
-| Drag the frame, or Option-drag | Fold |
-| Drag the background | Tilt |
-| `1` `2` `3` | Closed, book (130°), open |
-| `[` `]` | Fold 10° less or more |
-| `r` | Rotate a quarter turn |
-| `h` | Home |
-| `q` | Quit |
+## Remove
 
-The device needs one pointer move over the pane the first time it runs in a terminal. That
-move tells duorex where the pane is on screen.
+```sh
+rm ~/.local/bin/duorex ~/.config/rex/duorex.lua
+rm -rf ~/.local/share/duorex
+```
+
+Delete the two lines from `~/.config/rex/init.lua` if you added them. To delete the simulator too:
+
+```sh
+xcrun simctl delete "duorex Duo"
+```
+
+## Using it
+
+Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and starts serve-sim for it, which takes about 30 seconds. Later runs attach to the running server.
+
+- Click or drag on a screen to touch it. Scroll to scroll.
+- Drag the frame to fold. Option-drag folds from anywhere.
+- Drag the background to tilt.
+- `1` `2` `3` choose closed, book and open. `[` and `]` fold 10 degrees less or more.
+- `r` rotates, `h` goes home, `q` quits.
+
+The first time duorex runs in a terminal, move the pointer over the pane once. That tells duorex where the pane is on screen.
 
 Options:
 
 - `--device <name|udid>` uses another iPhone Duo simulator.
 - `--server <url>` attaches to a serve-sim that is already running, such as `http://127.0.0.1:3100`.
-- `--finish Light` selects the light model. The default is `Dark`.
-
-An agent can use the same simulator while you watch. serve-sim's own commands work on the
-device: `serve-sim tap`, `serve-sim fold 130`, `serve-sim rotate`. The device in the pane
-follows.
-
-## How it works
-
-- **Model.** `DuoScene` loads `V68.usdz` from the selected Xcode and renders it with RealityKit's
-  `RealityRenderer`. The fold is the model's own animation, scrubbed by the hinge angle.
-- **Screens.** serve-sim streams the active panel as H.264. `Sim` decodes it with VideoToolbox,
-  and `ScreenFeed` copies each frame on the GPU into the texture on the device.
-- **Input.** The terminal reports the pointer. `StageView` casts a ray from the pointer to the
-  bent screen and sends the hit to serve-sim as a touch.
-- **Docking.** A pointer report gives the pointer's position in the pane. The system gives its
-  position on screen. The difference is the pane's origin. `Dock` keeps the window there and
-  follows the terminal's window. In Rex, `RexHost` reads the layout to hide the device when its
-  tab is not showing.
+- `--finish Light` shows the light model. The default is `Dark`.
 
 ## Limits
 
-- Keyboard text does not reach the simulator. With Xcode 27, serve-sim can type only through
-  Device Hub.
-- The fold and inner-screen touch use private Xcode interfaces through serve-sim. An Xcode
-  update can break them. duorex pins the serve-sim release it was written against.
-- `duorex snapshot --out file.png` renders one frame without a window. It exists to check the
-  renderer.
+- Typing does not reach the simulator. With Xcode 27, serve-sim can type only through Device Hub.
+- Folding and touches on the inner screen use private Xcode interfaces through serve-sim, so an Xcode update can break them. duorex pins the serve-sim release it was written against.
+- Outside Rex, the device does not hide when you switch tabs, because other terminals do not report their layout.
+
+## Development
+
+```sh
+swift build
+swift test
+.build/debug/duorex snapshot --pattern --hinge 130 --out duo.png   # one frame, no window
+```
+
+The device is `DuoScene`, drawn by `StageView`. `Sim` and `ScreenFeed` bring the simulator's screen to it. `Pane` reads the terminal, and `Dock` keeps the window over the pane.
+
+## License
+
+[MIT License](LICENSE).
