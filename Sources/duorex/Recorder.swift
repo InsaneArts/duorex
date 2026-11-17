@@ -27,7 +27,7 @@ final class Recorder {
         stage = Stage.image(width: width, height: height)
         context = CIContext(mtlDevice: scene.device)
 
-        try? FileManager.default.removeItem(at: url)
+        try Self.makeRoom(at: url)
         writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
         input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
@@ -54,6 +54,15 @@ final class Recorder {
         writer.add(input)
         guard writer.startWriting() else { throw DuoError.render("could not start the movie: \(writer.error?.localizedDescription ?? "unknown error")") }
         writer.startSession(atSourceTime: .zero)
+    }
+
+    /// Removes a movie that has the new one's name. A folder is never removed: `--out` with
+    /// its value forgotten names the working directory.
+    static func makeRoom(at url: URL) throws {
+        var isFolder: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { return }
+        guard !isFolder.boolValue else { throw DuoError.render("\(url.path) is a folder. Give --out the name of a movie file.") }
+        try FileManager.default.removeItem(at: url)
     }
 
     /// Adds the scene, as it is posed now, to the movie. Call it after each change, with the time in seconds.
