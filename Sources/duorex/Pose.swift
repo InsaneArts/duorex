@@ -8,4 +8,11 @@ nonisolated struct Pose: Equatable {
     var yaw: Double = 0
     /// Tilt up and down.
     var pitch: Double = 0
+    /// The hardware button that is pushed in, and how far: 0 is out, 1 is fully in.
+    var press: Press?
+
+    struct Press: Equatable {
+        var button: HardwareButton
+        var depth: Double
+    }
 }
