@@ -13,6 +13,9 @@ final class Sim: NSObject, URLSessionDataDelegate {
     /// Another client of the server did something to the simulator. Most of the time it is an agent.
     var onActivity: ((SimWire.Activity) -> Void)?
 
+    /// The simulator's identifier.
+    var device: String { base.lastPathComponent }
+
     private let base: URL
     private var session: URLSession!
     private var streamTask: URLSessionDataTask?
