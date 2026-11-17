@@ -176,3 +176,12 @@ private func dragEvent(phase: String) -> String {
     #expect(sent.claims(.rotate("landscape_left"), time: 0.2) == false)
     #expect(sent.claims(.button("home", phase: "press"), time: 0.2) == false)
 }
+
+@Test func `a status of the server is not an activity`() {
+    var events = SimWire.Events()
+    // The server also logs what it does itself, such as starting its own 3D preview.
+    let renderer = #"{"source":"capture","kind":"duo.renderer","action":"start","summary":"Duo renderer started","id":7}"#
+    // A finger that comes up when the log follows no touch is logged raw.
+    let touch = #"{"source":"hid","kind":"touch","action":"end","summary":"Touch end 0.5,0.5","details":{"type":"end","x":0.5,"y":0.5},"id":8}"#
+    #expect(events.read(eventLine(renderer) + eventLine(touch)).isEmpty)
+}
