@@ -7,8 +7,9 @@ import CoreGraphics
 /// on screen: for a pointer over the pane, the difference is the pane's origin. Between
 /// reports, the origin is predicted from the window's chrome, which a measurement teaches.
 ///
-/// The origin is fixed for a given layout, so one good measurement is enough. Later reports
-/// may only correct it by a few points, and only from a pointer that is still.
+/// A report is older than the pointer's position on screen, so the two only belong together
+/// when the pointer is at rest. The origin is fixed for a given layout, so one measurement is
+/// enough. Later ones may only correct it by a few points.
 nonisolated struct PaneLocator {
     /// The window chrome above and to the right of the area the panes share, in points.
     /// It stays the same when the window, the pane or the layout changes.
@@ -32,8 +33,8 @@ nonisolated struct PaneLocator {
     /// What measurements taught about the window. Save it to place the pane at the next launch.
     private(set) var chrome: Chrome?
     private(set) var layout = Layout()
-    private var lastPointer = CGPoint.zero
-    private var lastTime = -Double.infinity
+    /// The last report, with where the pointer was on screen and the time when it arrived.
+    private var report: (local: CGPoint, pointer: CGPoint, time: Double)?
 
     init(chrome: Chrome? = nil) {
         self.chrome = chrome
@@ -60,20 +61,23 @@ nonisolated struct PaneLocator {
         isMeasured = false
     }
 
-    /// Whether a report can say where the pane is. Call it for every report, in order.
-    /// `pointer` is the pointer on screen, `local` its position in the pane, `time` in seconds.
-    mutating func wants(local: CGPoint, pointer: CGPoint, time: Double) -> Bool {
-        let step = hypot(pointer.x - lastPointer.x, pointer.y - lastPointer.y)
-        let gap = time - lastTime
-        lastPointer = pointer
-        lastTime = time
-        guard isInside(local) else { return false }
-        // A report lags the pointer by a few milliseconds. Two close reports in a row mean the
-        // pointer is slow enough for that lag not to matter.
-        return gap < 0.25 && step < (isMeasured ? 0.5 : 1.5)
+    /// Takes a pointer report. Call it for every report, in order.
+    /// `local` is the pointer's position in the pane, `pointer` the pointer on screen now, `time` in seconds.
+    mutating func reported(local: CGPoint, pointer: CGPoint, time: Double) {
+        report = isInside(local) ? (local, pointer, time) : nil
     }
 
-    /// Takes the origin a wanted report gives. Returns true when the origin changed.
+    /// The pointer's position in the pane, once the pointer is at rest there. Ask at every tick.
+    /// A terminal reports every move, so a last report that stays the last one is from a pointer
+    /// at rest. The pointer must also be where it was then: it can move where the terminal does not see it.
+    mutating func restingReport(pointer: CGPoint, time: Double) -> CGPoint? {
+        guard let report, time - report.time >= 0.1 else { return nil }
+        self.report = nil
+        guard hypot(pointer.x - report.pointer.x, pointer.y - report.pointer.y) < 1 else { return nil }
+        return report.local
+    }
+
+    /// Takes the origin a resting report gives. Returns true when the origin changed.
     mutating func measure(_ candidate: CGPoint) -> Bool {
         if isMeasured, let origin {
             let change = hypot(origin.x - candidate.x, origin.y - candidate.y)
