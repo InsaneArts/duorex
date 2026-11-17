@@ -31,7 +31,6 @@ final class DuoScene {
     private let slots: [Panel: (entity: ModelEntity, material: Int)]
     private let surfaces: [Panel: ScreenSurface]
     private let flatBounds: BoundingBox
-    private var outputs: [ObjectIdentifier: RealityRenderer.CameraOutput] = [:]
     private(set) var pose = Pose()
     /// True when the last frame drawn does not yet show the pose: one more frame is needed.
     private(set) var needsSettling = true
@@ -162,15 +161,10 @@ final class DuoScene {
             aspect = newAspect
             frameCamera()
         }
-        let key = ObjectIdentifier(frame)
-        if outputs[key] == nil {
-            if outputs.count > 8 { outputs.removeAll() }
-            outputs[key] = try RealityRenderer.CameraOutput(.singleProjection(colorTexture: frame.texture))
-        }
         // The fold rig follows a new hinge angle one frame late.
         needsSettling = pose.hinge != drawnHinge
         drawnHinge = pose.hinge
-        try renderer.updateAndRender(deltaTime: 1.0 / 60, cameraOutput: outputs[key]!, onComplete: { _ in onComplete() })
+        try renderer.updateAndRender(deltaTime: 1.0 / 60, cameraOutput: frame.output, onComplete: { _ in onComplete() })
     }
 
     /// What the scene has under a point of the view. `point` is 0...1 with the origin at the top left.

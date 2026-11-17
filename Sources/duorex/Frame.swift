@@ -2,12 +2,15 @@ import CoreGraphics
 import CoreVideo
 import IOSurface
 import Metal
+import RealityKit
 
 /// A picture the scene draws into. It is an IOSurface, so a layer can show it and an image can
 /// be read from it, in the pixel format and the colour space the renderer writes.
 final class Frame {
     let surface: IOSurface
     let texture: MTLTexture
+    /// Where the renderer draws. It belongs to the frame, so it is never used for another frame's texture.
+    let output: RealityRenderer.CameraOutput
     var width: Int { texture.width }
     var height: Int { texture.height }
 
@@ -16,11 +19,13 @@ final class Frame {
         descriptor.usage = [.renderTarget, .shaderRead]
         guard width > 0, height > 0,
               let surface = IOSurface(properties: [.width: width, .height: height, .bytesPerElement: 4, .pixelFormat: kCVPixelFormatType_32BGRA]),
-              let texture = device.makeTexture(descriptor: descriptor, iosurface: surface, plane: 0) else { return nil }
+              let texture = device.makeTexture(descriptor: descriptor, iosurface: surface, plane: 0),
+              let output = try? RealityRenderer.CameraOutput(.singleProjection(colorTexture: texture)) else { return nil }
         // RealityRenderer writes Display P3 colours.
         if let space = Self.colorSpace.copyPropertyList() { IOSurfaceSetValue(surface, kIOSurfaceColorSpace, space) }
         self.surface = surface
         self.texture = texture
+        self.output = output
     }
 
     /// The picture as an image, with a transparent background. Read it once the scene has finished drawing.
