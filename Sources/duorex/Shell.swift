@@ -13,21 +13,36 @@ nonisolated enum Shell {
     }
 
     /// The tool's standard output, without the trailing newline. Standard error goes only into the failure.
-    static func run(_ tool: String, _ arguments: [String]) async throws -> String {
+    static func run(_ tool: String, _ arguments: [String], in directory: URL? = nil) async throws -> String {
+        let result = try await result(tool, arguments, in: directory)
+        guard result.status == 0 else {
+            throw Failure(tool: name(of: tool, arguments), reason: result.errors.isEmpty ? "exit status \(result.status)" : result.errors)
+        }
+        return result.output
+    }
+
+    /// What a tool printed and how it ended, for a tool whose output matters when it fails
+    /// too. It throws only when the tool could not start.
+    static func result(_ tool: String, _ arguments: [String], in directory: URL? = nil) async throws -> (status: Int32, output: String, errors: String) {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global().async {
-                continuation.resume(with: Result { try runAndWait(tool, arguments) })
+                continuation.resume(with: Result { try runAndWait(tool, arguments, in: directory) })
             }
         }
     }
 
-    private static func runAndWait(_ tool: String, _ arguments: [String]) throws -> String {
+    /// `env` and `xcrun` only find the real tool, which is their first argument.
+    private static func name(of tool: String, _ arguments: [String]) -> String {
         let launcher = URL(fileURLWithPath: tool).lastPathComponent
-        // `env` and `xcrun` only find the real tool, which is their first argument.
-        let name = ["env", "xcrun"].contains(launcher) ? arguments.first ?? launcher : launcher
+        return ["env", "xcrun"].contains(launcher) ? arguments.first ?? launcher : launcher
+    }
+
+    private static func runAndWait(_ tool: String, _ arguments: [String], in directory: URL?) throws -> (status: Int32, output: String, errors: String) {
+        let name = name(of: tool, arguments)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = arguments
+        if let directory { process.currentDirectoryURL = directory }
         let output = Pipe(), errors = Pipe()
         process.standardOutput = output
         process.standardError = errors
@@ -45,10 +60,7 @@ nonisolated enum Shell {
         let text = output.fileHandleForReading.readDataToEndOfFile()
         reading.wait()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let reason = String(decoding: errorText.withLock { $0 }, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            throw Failure(tool: name, reason: reason.isEmpty ? "exit status \(process.terminationStatus)" : reason)
-        }
-        return String(decoding: text, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        func trimmed(_ data: Data) -> String { String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) }
+        return (process.terminationStatus, trimmed(text), trimmed(errorText.withLock { $0 }))
     }
 }
