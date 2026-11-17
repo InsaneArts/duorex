@@ -36,6 +36,7 @@ final class Session {
     private var noteTimer: Timer?
     /// Whether duorex made the simulator's animations slow.
     private var slow = false
+    private var changing: Task<Void, Never>?
     /// Hinge angles for the three poses the number keys choose.
     private static let poses: [Character: Double] = ["1": 0, "2": 130, "3": 180]
 
@@ -178,9 +179,12 @@ final class Session {
     }
 
     /// Changes a setting of the simulator, and says the new value or why it did not change.
+    /// A change waits for the one before it, so two quick presses of a key are two changes.
     private func change(_ setting: @escaping (String) async throws -> String) {
         guard let device = sim?.device else { return tell("no simulator") }
-        Task {
+        let before = changing
+        changing = Task {
+            await before?.value
             do { tell(try await setting(device)) } catch { tell("\(error)") }
         }
     }
