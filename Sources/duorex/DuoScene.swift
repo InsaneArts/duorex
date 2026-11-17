@@ -44,20 +44,8 @@ final class DuoScene {
     private static let screenMaterials: [Panel: String] = [.cover: "YqugYDOqMSOpqyA", .inner: "CvyXbAGXoolRUYl"]
 
     /// Apple's Duo model inside the selected Xcode. It is read in place and never copied.
-    static func modelURL() throws -> URL {
-        let developer: String
-        if let override = ProcessInfo.processInfo.environment["DEVELOPER_DIR"] {
-            developer = override
-        } else {
-            let select = Process()
-            select.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
-            select.arguments = ["-p"]
-            let pipe = Pipe()
-            select.standardOutput = pipe
-            try select.run()
-            select.waitUntilExit()
-            developer = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+    static func modelURL() async throws -> URL {
+        let developer = if let chosen = ProcessInfo.processInfo.environment["DEVELOPER_DIR"] { chosen } else { try await Shell.run("/usr/bin/xcode-select", ["-p"]) }
         let url = URL(fileURLWithPath: developer)
             .appendingPathComponent("../SharedFrameworks/DeviceKit.framework/Versions/A/PlugIns/CoreDevicePopDeviceKitExtension.devicekitplugin/Contents/Resources/V68.usdz")
             .standardizedFileURL
@@ -72,7 +60,7 @@ final class DuoScene {
         guard let device = MTLCreateSystemDefaultDevice() else { throw DuoError.render("no Metal device") }
         self.device = device
         renderer = try RealityRenderer()
-        let catalog = try await Entity.ConfigurationCatalog(from: Self.modelURL())
+        let catalog = try await Entity.ConfigurationCatalog(from: try await Self.modelURL())
         let loaded = try await Entity(from: catalog, configurations: ["color": finish])
         subject = loaded.findEntity(named: "root") ?? loaded
         guard let clip = subject.availableAnimations.first(where: { $0.name == Self.foldClip.name && $0.definition.duration.isFinite }) else {
