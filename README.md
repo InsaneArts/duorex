@@ -26,6 +26,10 @@ The power, volume and camera control buttons on the frame are real. Click one an
 
 The buttons are small, so rest the pointer on one and the pane names it. On a closed device the front half covers them, and they still work where the pane names them.
 
+## Test the settings with one key
+
+`d` switches between the light and the dark appearance. `+` and `-` change the text size. `s` makes every animation slow, and `w` sends a memory warning. The line under the device says what changed.
+
 ## See every posture at once
 
 `duorex sweep` folds the simulator through closed, book and open, held upright and turned, and saves one picture of them all. Each cell shows the screen the right way up, the device in that posture, and the size your app got.
@@ -123,6 +127,8 @@ Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and
 - Drag the background to tilt.
 - `1` `2` `3` choose closed, book and open. `[` and `]` fold 10 degrees less or more.
 - `r` rotates, `h` goes home, `q` quits.
+- `d` switches dark mode. `+` and `-` change the text size. `s` slows the animations. `w` sends a memory warning.
+- `?` shows the keys, a few at a time.
 
 The first time duorex runs in a terminal, move the pointer over the pane once. That tells duorex where the pane is on screen.
 
