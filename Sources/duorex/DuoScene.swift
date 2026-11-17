@@ -33,6 +33,9 @@ final class DuoScene {
     private let flatBounds: BoundingBox
     private var outputs: [ObjectIdentifier: RealityRenderer.CameraOutput] = [:]
     private(set) var pose = Pose()
+    /// True when the last frame drawn does not yet show the pose: one more frame is needed.
+    private(set) var needsSettling = true
+    private var drawnHinge: Double?
     private var aspect: Float = 1
 
     /// A 36 mm sensor behind a 105 mm lens: enough perspective to read as an object, not a diagram.
@@ -139,20 +142,35 @@ final class DuoScene {
         frameCamera()
     }
 
-    /// Renders the scene into `texture`. `whenScheduled` runs once the GPU work is queued.
-    func render(into texture: MTLTexture, deltaTime: TimeInterval, whenScheduled: (@Sendable () -> Void)? = nil, onComplete: (@Sendable () -> Void)? = nil) throws {
-        let newAspect = Float(texture.width) / Float(texture.height)
+    /// Draws `pose` into `frame`, and returns when the picture shows it.
+    func draw(_ pose: Pose, into frame: Frame) async throws {
+        apply(pose)
+        repeat {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                do {
+                    try render(into: frame) { continuation.resume() }
+                } catch { continuation.resume(throwing: error) }
+            }
+        } while needsSettling
+    }
+
+    /// Draws one frame of the current pose. `onComplete` runs when the picture is ready, on any thread.
+    /// Afterwards `needsSettling` says whether the pose needs one more frame.
+    func render(into frame: Frame, onComplete: @escaping @Sendable () -> Void) throws {
+        let newAspect = Float(frame.width) / Float(frame.height)
         if newAspect != aspect {
             aspect = newAspect
             frameCamera()
         }
-        let key = ObjectIdentifier(texture)
+        let key = ObjectIdentifier(frame)
         if outputs[key] == nil {
             if outputs.count > 8 { outputs.removeAll() }
-            outputs[key] = try RealityRenderer.CameraOutput(.singleProjection(colorTexture: texture))
+            outputs[key] = try RealityRenderer.CameraOutput(.singleProjection(colorTexture: frame.texture))
         }
-        try renderer.updateAndRender(deltaTime: deltaTime, cameraOutput: outputs[key]!,
-                                     whenScheduled: { _ in whenScheduled?() }, onComplete: { _ in onComplete?() })
+        // The fold rig follows a new hinge angle one frame late.
+        needsSettling = pose.hinge != drawnHinge
+        drawnHinge = pose.hinge
+        try renderer.updateAndRender(deltaTime: 1.0 / 60, cameraOutput: outputs[key]!, onComplete: { _ in onComplete() })
     }
 
     /// What the scene has under a point of the view. `point` is 0...1 with the origin at the top left.

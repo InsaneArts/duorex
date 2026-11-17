@@ -1,6 +1,4 @@
 import AppKit
-import Metal
-import IOSurface
 import QuartzCore
 
 /// Draws the device at display rate. The pose and the gestures are `DeviceMotion`'s; this view
@@ -15,17 +13,16 @@ final class StageView: NSView {
 
     private var motion = DeviceMotion()
     private var link: CADisplayLink?
-    /// Frames are drawn into these in turn, and the finished one becomes the layer's contents.
-    private var surfaces: [(surface: IOSurface, texture: MTLTexture)] = []
-    private var nextSurface = 0
-    private var surfaceGeneration = 0
+    /// The device is drawn into these in turn, and the finished one becomes the layer's contents:
+    /// one on screen, one being drawn, one spare.
+    private var frames: [Frame] = []
+    private var nextFrame = 0
     private var rendering = false
     /// Frames drawn since the last reading, for the frame rate in the debug log.
     private(set) var framesDrawn = 0
 
     func resetFrameCount() { framesDrawn = 0 }
-    /// Frames still to draw. The fold rig settles one frame after the pose stops changing.
-    private var pendingFrames = 3
+    private var needsRender = true
 
     init(scene: DuoScene) {
         self.scene = scene
@@ -49,41 +46,29 @@ final class StageView: NSView {
         guard window != nil else { return }
         link = displayLink(target: self, selector: #selector(tick(_:)))
         link?.add(to: .main, forMode: .common)
-        makeSurfaces()
+        makeFrames()
     }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         motion.viewSize = CGSize(width: max(newSize.width, 1), height: max(newSize.height, 1))
-        makeSurfaces()
+        makeFrames()
     }
 
-    override func viewDidChangeBackingProperties() { makeSurfaces() }
+    override func viewDidChangeBackingProperties() { makeFrames() }
 
-    /// Three surfaces: one on screen, one being drawn, one spare.
-    private func makeSurfaces() {
+    private func makeFrames() {
         let scale = window?.backingScaleFactor ?? 2
         let width = Int(bounds.width * scale), height = Int(bounds.height * scale)
-        guard width > 1, height > 1, surfaces.first.map({ $0.texture.width != width || $0.texture.height != height }) ?? true else { return }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm_srgb, width: width, height: height, mipmapped: false)
-        descriptor.usage = [.renderTarget, .shaderRead]
-        surfaces = (0..<3).compactMap { _ in
-            guard let surface = IOSurface(properties: [.width: width, .height: height, .bytesPerElement: 4, .pixelFormat: kCVPixelFormatType_32BGRA]),
-                  let texture = scene.device.makeTexture(descriptor: descriptor, iosurface: surface, plane: 0) else { return nil }
-            // RealityRenderer writes Display P3 colors.
-            if let space = CGColorSpace(name: CGColorSpace.displayP3)?.copyPropertyList() {
-                IOSurfaceSetValue(surface, kIOSurfaceColorSpace, space)
-            }
-            return (surface, texture)
-        }
-        surfaceGeneration += 1
-        nextSurface = 0
+        guard width > 1, height > 1, frames.first.map({ $0.width != width || $0.height != height }) ?? true else { return }
+        frames = (0..<3).compactMap { _ in Frame(device: scene.device, width: width, height: height) }
+        nextFrame = 0
         layer?.contentsScale = scale
         setNeedsRender()
     }
 
     /// Asks for a new frame, as when a screen texture changed.
-    func setNeedsRender() { pendingFrames = max(pendingFrames, 2) }
+    func setNeedsRender() { needsRender = true }
 
     var hingeDegrees: Double { motion.pose.hinge }
 
@@ -145,22 +130,22 @@ final class StageView: NSView {
         let step = motion.step(to: CACurrentMediaTime())
         step.effects.forEach { onEffect?($0) }
         if step.moving { setNeedsRender() }
-        guard pendingFrames > 0, !rendering, window?.isVisible == true, !surfaces.isEmpty else { return }
-        pendingFrames -= 1
+        guard needsRender || scene.needsSettling, !rendering, window?.isVisible == true, !frames.isEmpty else { return }
+        needsRender = false
         scene.apply(motion.pose)
-        let index = nextSurface, generation = surfaceGeneration
-        nextSurface = (nextSurface + 1) % surfaces.count
+        let frame = frames[nextFrame]
+        nextFrame = (nextFrame + 1) % frames.count
         rendering = true
         do {
-            try scene.render(into: surfaces[index].texture, deltaTime: 1.0 / 60, onComplete: { [weak self] in
+            try scene.render(into: frame) { [weak self, weak frame] in
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.rendering = false
                     self.framesDrawn += 1
-                    // A resize may have replaced the surfaces while this frame was drawing.
-                    if generation == self.surfaceGeneration { self.layer?.contents = self.surfaces[index].surface }
+                    // A resize may have replaced the frames while this one was drawing.
+                    if let frame, self.frames.contains(where: { $0 === frame }) { self.layer?.contents = frame.surface }
                 }
-            })
+            }
         } catch {
             rendering = false
             log.error("render: \(String(describing: error), privacy: .public)")
