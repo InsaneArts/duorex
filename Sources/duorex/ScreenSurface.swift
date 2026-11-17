@@ -8,8 +8,9 @@ nonisolated struct ScreenLeaf {
     /// The part of the framebuffer this leaf shows, as x, y, width, height in 0...1.
     var region: SIMD4<Float>
 
-    /// Where a ray meets this leaf, in framebuffer coordinates, with the distance along the ray.
-    func intersect(origin: SIMD3<Float>, direction: SIMD3<Float>) -> (uv: SIMD2<Float>, distance: Float)? {
+    /// Where a ray meets this leaf's plane, in framebuffer coordinates.
+    /// `outside` is how far the point lies beyond the leaf, in framebuffer units; 0 means on the screen.
+    func intersect(origin: SIMD3<Float>, direction: SIMD3<Float>) -> (uv: SIMD2<Float>, distance: Float, outside: Float)? {
         let e1 = b - a, e2 = c - a
         let normal = simd_cross(e1, e2)
         let facing = simd_dot(direction, normal)
@@ -23,8 +24,9 @@ nonisolated struct ScreenLeaf {
         guard abs(det) > 1e-18 else { return nil }
         let alpha = (d22 * w1 - d12 * w2) / det, beta = (d11 * w2 - d12 * w1) / det
         let uv = uvA + (uvB - uvA) * alpha + (uvC - uvA) * beta
-        guard uv.x >= region.x, uv.x <= region.x + region.z, uv.y >= region.y, uv.y <= region.y + region.w else { return nil }
-        return (uv, distance)
+        let low = SIMD2(region.x, region.y), high = SIMD2(region.x + region.z, region.y + region.w)
+        let clamped = simd_clamp(uv, low, high)
+        return (clamped, distance, simd_distance(uv, clamped))
     }
 }
 

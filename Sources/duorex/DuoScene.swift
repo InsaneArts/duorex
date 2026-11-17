@@ -169,13 +169,14 @@ final class DuoScene {
     }
 
     /// The screen point under a view position. `point` is 0...1 with the origin at the top left.
-    func screenHit(at point: CGPoint, panel: Panel) -> ScreenHit? {
+    /// `reach` is how far past the glass still counts, in framebuffer units: 0 for a tap,
+    /// a bezel width to find the frame, infinity to follow a drag that left the screen.
+    func screenHit(at point: CGPoint, panel: Panel, reach: Float = 0) -> ScreenHit? {
         guard let surface = surfaces[panel] else { return nil }
         let tangent = tan(fieldOfView * .pi / 360)
         let direction = simd_normalize(SIMD3<Float>((Float(point.x) * 2 - 1) * aspect * tangent, (1 - Float(point.y) * 2) * tangent, -1))
-        let origin = camera.position
-        let hits = surface.worldLeaves().compactMap { $0.intersect(origin: origin, direction: direction) }
-        guard let nearest = hits.min(by: { $0.distance < $1.distance }) else { return nil }
+        let hits = surface.worldLeaves().compactMap { $0.intersect(origin: camera.position, direction: direction) }
+        guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }), nearest.outside <= reach else { return nil }
         return ScreenHit(panel: panel, point: CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y)))
     }
 
