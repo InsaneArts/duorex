@@ -232,10 +232,8 @@ nonisolated struct DeviceMotion {
             yaw.hold(Self.shorterWay(yaw.value))
             pitch.hold(Self.shorterWay(pitch.value))
             comingBack = max(abs(yaw.value), abs(pitch.value)) > 30
-            if comingBack {
-                yaw.damping = 0.95
-                pitch.damping = 0.95
-            }
+            yaw.damping = comingBack ? 0.95 : Self.bounce
+            pitch.damping = yaw.damping
         case .none:
             break
         }
