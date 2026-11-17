@@ -57,7 +57,7 @@ final class MarkLayer {
     func show(_ marks: [Mark], on leaves: [ScreenLeaf]) {
         var used = 0
         // The way the whole screen faces: between its leaves when it is bent.
-        let facing = simd_normalize(leaves.map { Self.normal(of: $0) }.reduce(.zero, +))
+        let facing = simd_normalize(leaves.map(\.outward).reduce(.zero, +))
         for mark in marks {
             let middle = SIMD2<Float>(Float(mark.point.x), Float(mark.point.y))
             for leaf in leaves {
@@ -77,14 +77,9 @@ final class MarkLayer {
                     root.addChild(discs[used])
                 }
                 let disc = discs[used]
-                // The disc's own x runs across the framebuffer and its y runs up it, with its
-                // face toward the camera, which looks along the z axis.
-                var across = simd_normalize(place.across)
-                var normal = simd_normalize(simd_cross(across, -place.down))
-                if normal.z < 0 {
-                    across = -across
-                    normal = -normal
-                }
+                // The disc's own x runs across the framebuffer and its y runs up it, so it faces
+                // the way the screen does. From behind the device, it does not show.
+                let across = simd_normalize(place.across), normal = leaf.outward
                 let rotation = simd_quatf(simd_float3x3(columns: (across, simd_cross(normal, across), normal)))
                 let center = place.point + place.down * ((low + high) / 2 - middle.y)
                 disc.transform = Transform(scale: SIMD3(radius * 2, (high - low) * simd_length(place.down), 1), rotation: rotation,
@@ -100,12 +95,6 @@ final class MarkLayer {
             }
         }
         for disc in discs[used...] { disc.isEnabled = false }
-    }
-
-    /// The way a leaf faces. The lit screen faces the camera, which looks along the z axis.
-    private static func normal(of leaf: ScreenLeaf) -> SIMD3<Float> {
-        let normal = simd_normalize(simd_cross(leaf.b - leaf.a, leaf.c - leaf.a))
-        return normal.z < 0 ? -normal : normal
     }
 
     /// A material that shows a square picture with a clear background, drawn by `draw` in a
