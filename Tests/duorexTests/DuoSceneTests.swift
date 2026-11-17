@@ -39,3 +39,30 @@ func `an open device is touched on its inner screen and held by its frame`() asy
     scene.apply(Pose(hinge: 180, yaw: 180))
     #expect(!probes(scene, panel: .inner).contains { $0.glass != nil })
 }
+
+@MainActor @Test(.enabled("needs the Duo model in Xcode") { await hasModel() })
+func `a strobe picture has the asked size and shows the half that folds above the half that lies still`() async throws {
+    let scene = try await DuoScene()
+    scene.setScreen(.inner, texture: try Snapshot.testPattern(label: "INNER", width: 1200, height: 1300))
+    let image = try await Strobe.image(scene: scene, width: 640, height: 360)
+    #expect(image.width == 640 && image.height == 360)
+    // The stage alone is dark. The device and its exposures are not.
+    let space = CGColorSpace(name: CGColorSpace.sRGB)!
+    let context = try #require(CGContext(data: nil, width: 64, height: 36, bitsPerComponent: 8, bytesPerRow: 64 * 4, space: space,
+                                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    context.draw(image, in: CGRect(x: 0, y: 0, width: 64, height: 36))
+    let pixels = UnsafeBufferPointer(start: try #require(context.data).assumingMemoryBound(to: UInt8.self), count: 64 * 36 * 4)
+    // The memory's first row is the picture's top row.
+    func lit(rows: Range<Int>) -> Int {
+        rows.reduce(0) { count, row in
+            count + (0..<64).filter { column in
+                let index = (row * 64 + column) * 4
+                return max(pixels[index], pixels[index + 1], pixels[index + 2]) > 90
+            }.count
+        }
+    }
+    // The upright half reaches into the top part of the picture, and the flat half fills the lower part.
+    #expect(lit(rows: 4..<14) > 4)
+    #expect(lit(rows: 18..<32) > 30)
+    #expect(lit(rows: 0..<2) == 0)
+}

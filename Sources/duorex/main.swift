@@ -1,4 +1,5 @@
 import AppKit
+import RealityKit
 
 /// Reads `--name value` pairs and bare flags after the subcommand.
 struct Arguments {
@@ -34,6 +35,28 @@ var signalSources: [DispatchSourceSignal] = []
 func fail(_ error: any Error) -> Never {
     FileHandle.standardError.write(Data("duorex: \(error)\n".utf8))
     exit(1)
+}
+
+/// Runs work that moves the simulator, then exits. Ctrl-C stops the work, and the work puts
+/// the simulator back before duorex exits.
+func untilDone(_ work: @escaping () async throws -> Void) -> Never {
+    let working = Task {
+        do {
+            try await work()
+            exit(0)
+        } catch is CancellationError {
+            exit(130)
+        } catch { fail(error) }
+    }
+    for number in [SIGINT, SIGTERM] {
+        signal(number, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+        source.setEventHandler { working.cancel() }
+        source.resume()
+        signalSources.append(source)
+    }
+    RunLoop.main.run()
+    exit(0)
 }
 
 func scene() async throws -> DuoScene {
@@ -75,33 +98,36 @@ case "snapshot":
         } catch { fail(error) }
     }
     dispatchMain()
-case "sweep":
-    let sweeping = Task {
-        do {
-            // Find out now that the sheet can be saved, not after the sweep.
-            let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-sweep.png")
-            guard FileManager.default.isWritableFile(atPath: out.deletingLastPathComponent().path) else {
-                throw DuoError.render("cannot write to \(out.deletingLastPathComponent().path)")
-            }
-            let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
+case "strobe":
+    untilDone {
+        let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-strobe.png")
+        let size = (arguments.string("size") ?? "2560x1440").split(separator: "x").compactMap { Int($0) }
+        guard size.count == 2, size.allSatisfy({ (64...8192).contains($0) }) else {
+            throw DuoError.render("--size takes a width and a height, such as 2560x1440")
+        }
+        let scene = try await scene()
+        if !arguments.flag("pattern") {
+            // The picture shows the app as it is on the open device, on every exposure.
             let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-            let shots = try await Sweep(sim: Sim(base: address), scene: scene).run { print($0) }
-            try ContactSheet.write(shots, to: out)
-            print(out.path)
-            exit(0)
-        } catch is CancellationError {
-            exit(130)
-        } catch { fail(error) }
+            let screen = try await Sweep(sim: Sim(base: address), scene: scene).openScreen()
+            scene.setScreen(.inner, texture: try await TextureResource(image: screen, options: .init(semantic: .color)))
+        }
+        try await Strobe.write(scene: scene, width: size[0], height: size[1], to: out)
+        print(out.path)
     }
-    // Ctrl-C stops the sweep, and the sweep puts the simulator back before duorex exits.
-    for number in [SIGINT, SIGTERM] {
-        signal(number, SIG_IGN)
-        let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-        source.setEventHandler { sweeping.cancel() }
-        source.resume()
-        signalSources.append(source)
+case "sweep":
+    untilDone {
+        // Find out now that the sheet can be saved, not after the sweep.
+        let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-sweep.png")
+        guard FileManager.default.isWritableFile(atPath: out.deletingLastPathComponent().path) else {
+            throw DuoError.render("cannot write to \(out.deletingLastPathComponent().path)")
+        }
+        let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
+        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+        let shots = try await Sweep(sim: Sim(base: address), scene: scene).run { print($0) }
+        try ContactSheet.write(shots, to: out)
+        print(out.path)
     }
-    RunLoop.main.run()
 case "view", "record":
     NSApplication.shared.setActivationPolicy(.accessory)
     Task {
@@ -132,6 +158,6 @@ case "view", "record":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex record [--out movie.mp4] [--size 1920x1080]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex update\n       duorex version\n".utf8))
+    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex record [--out movie.mp4] [--size 1920x1080]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex strobe [--out poster.png] [--size 2560x1440]\n       duorex update\n       duorex version\n".utf8))
     exit(2)
 }
