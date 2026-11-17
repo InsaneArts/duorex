@@ -67,10 +67,13 @@ final class Recorder {
     }
 
     /// Adds the scene, as it is posed now, to the movie. Call it after each change, with the time in seconds.
-    /// It keeps to 60 pictures a second and skips a picture while the last one is still drawing.
-    func capture(scene: DuoScene, time: Double) {
-        guard !closing, !drawing, time - lastTime >= 1.0 / 61 else { return }
+    /// It keeps to 60 pictures a second and draws one picture at a time. Returns false when
+    /// this picture has to wait: ask again at the next tick.
+    func capture(scene: DuoScene, time: Double) -> Bool {
+        guard !closing else { return true }
+        guard !drawing, time - lastTime >= 1.0 / 61 else { return false }
         draw(scene, at: time)
+        return true
     }
 
     /// Ends the movie at `time`, so it lasts as long as the recording did, and writes the file.
