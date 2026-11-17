@@ -63,7 +63,7 @@ case "snapshot":
             let gray = arguments.string("backdrop").flatMap(Double.init)
             try await Snapshot.write(scene: try await scene(), pose: pose, width: Int(arguments.double("width", default: 1400)),
                                      height: Int(arguments.double("height", default: 1000)),
-                                     backdrop: gray.map { CGColor(gray: $0, alpha: 1) }, to: out)
+                                     backdrop: gray.map { CGColor(gray: $0, alpha: 1) }, onStage: arguments.flag("stage"), to: out)
             print(out.path)
             exit(0)
         } catch { fail(error) }
@@ -96,11 +96,21 @@ case "sweep":
         signalSources.append(source)
     }
     RunLoop.main.run()
-case "view":
+case "view", "record":
     NSApplication.shared.setActivationPolicy(.accessory)
     Task {
         do {
-            let running = try Session(scene: try await scene())
+            var movie: (url: URL, width: Int, height: Int)?
+            if arguments.command == "record" {
+                let stamp = Date().formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false).dateSeparator(.omitted).timeSeparator(.omitted))
+                let folder = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: ".")
+                let size = (arguments.string("size") ?? "1920x1080").split(separator: "x").compactMap { Int($0) }
+                guard size.count == 2, size.allSatisfy({ (64...4096).contains($0) && $0 % 2 == 0 }) else {
+                    throw DuoError.render("--size takes a width and a height, both even, such as 1920x1080")
+                }
+                movie = (arguments.string("out").map { URL(fileURLWithPath: $0) } ?? folder.appendingPathComponent("duorex-\(stamp).mp4"), size[0], size[1])
+            }
+            let running = try Session(scene: try await scene(), movie: movie)
             session = running
             running.start()
             guard !arguments.flag("pattern") else { return }
@@ -113,6 +123,6 @@ case "view":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex update\n       duorex version\n".utf8))
+    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex record [--out movie.mp4] [--size 1920x1080]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex update\n       duorex version\n".utf8))
     exit(2)
 }
