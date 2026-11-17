@@ -131,7 +131,8 @@ final class StageView: NSView {
     }
 
     private func probe(_ point: CGPoint) -> Probe {
-        scene.probe(at: CGPoint(x: point.x / max(bounds.width, 1), y: point.y / max(bounds.height, 1)), panel: activePanel)
+        scene.probe(at: CGPoint(x: point.x / max(bounds.width, 1), y: point.y / max(bounds.height, 1)),
+                    aspect: Float(bounds.width / max(bounds.height, 1)), panel: activePanel)
     }
 
     private func send(_ effects: [DeviceMotion.Effect]) {
