@@ -173,8 +173,9 @@ final class Dock {
 
     // MARK: Window server
 
+    /// Earlier builds saved chrome learned from clamped reports under "chrome.". This key is clean.
     private static func chromeKey(_ pid: pid_t) -> String {
-        "chrome." + (NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "terminal")
+        "paneChrome." + (NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "terminal")
     }
 
     /// Height of the primary screen. Quartz measures from its top, AppKit from its bottom.
