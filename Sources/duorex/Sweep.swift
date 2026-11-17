@@ -46,14 +46,7 @@ final class Sweep {
     /// `progress` gets a line for each stop. It throws when the simulator does not reach a
     /// posture, and when the task is cancelled. Either way the simulator is put back first.
     func run(progress: (String) -> Void) async throws -> [Shot] {
-        sim.start()
-        guard await wait(seconds: 20, until: { frame != nil && report != nil }) else {
-            throw DuoError.sim("the simulator sent no picture. Is it booted?")
-        }
-        // A server that just started reports the hinge a moment after its first report.
-        _ = await wait(seconds: 3) { report?.hingeDegrees != nil }
-        let start = (hinge: report?.hingeDegrees ?? (litPanel == .cover ? 0 : 180),
-                     held: report?.duoViewOrientation.flatMap(Orientation.init(rawValue:)) ?? .portrait)
+        let start = try await connect()
 
         var shots: [Shot] = []
         var hinge = start.hinge
@@ -94,6 +87,35 @@ final class Sweep {
         try Task.checkCancellation()
         if let failure { throw failure }
         return shots
+    }
+
+    /// The inner screen as the simulator draws it with the device open. The simulator is
+    /// opened for the picture if it is not open, and put back after.
+    func openScreen() async throws -> CGImage {
+        let start = try await connect()
+        var screen: CGImage?
+        if await fold(from: start.hinge, to: 180) {
+            if start.hinge < 180 { try? await Task.sleep(for: .milliseconds(900)) }
+            _ = await wait(seconds: 5) { frame.flatMap(Self.image).map { !Self.isBlank($0) } ?? false }
+            screen = frame.flatMap(Self.image)
+        }
+        await Task { _ = await fold(from: 180, to: start.hinge) }.value
+        sim.stop()
+        try Task.checkCancellation()
+        guard let screen else { throw DuoError.sim("the simulator did not open for the picture.") }
+        return screen
+    }
+
+    /// Connects to the simulator, and returns the pose it is in.
+    private func connect() async throws -> (hinge: Double, held: Orientation) {
+        sim.start()
+        guard await wait(seconds: 20, until: { frame != nil && report != nil }) else {
+            throw DuoError.sim("the simulator sent no picture. Is it booted?")
+        }
+        // A server that just started reports the hinge a moment after its first report.
+        _ = await wait(seconds: 3) { report?.hingeDegrees != nil }
+        return (report?.hingeDegrees ?? (litPanel == .cover ? 0 : 180),
+                report?.duoViewOrientation.flatMap(Orientation.init(rawValue:)) ?? .portrait)
     }
 
     /// Moves the hinge in small steps, as a hand does. A jump can leave the iOS 27.1 simulator on the wrong screen.
