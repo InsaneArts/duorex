@@ -16,6 +16,20 @@ Click, drag and scroll on either screen. The touch lands where you point, on a f
 
 Drag the background to tilt the device. It springs back when you let go.
 
+## See every posture at once
+
+`duorex sweep` folds the simulator through closed, book and open, held upright and turned, and saves one picture of them all. Each cell shows the screen the right way up, the device in that posture, and the size your app got.
+
+```sh
+duorex sweep --out sweep.png
+```
+
+<p align="center">
+  <img src=".github/assets/sweep.png" width="100%" alt="A contact sheet of six postures: Settings on the cover screen, and on the inner screen as a book and open, upright and turned" />
+</p>
+
+It takes about 20 seconds and puts the simulator back the way it was. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
+
 ## It stays in its pane
 
 duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
