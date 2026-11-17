@@ -102,13 +102,16 @@ case "view", "record":
         do {
             var movie: (url: URL, width: Int, height: Int)?
             if arguments.command == "record" {
-                let stamp = Date().formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false).dateSeparator(.omitted).timeSeparator(.omitted))
+                // The time on the user's clock, in a form that sorts by name.
+                let stamp = DateFormatter()
+                stamp.locale = Locale(identifier: "en_US_POSIX")
+                stamp.dateFormat = "yyyyMMdd-HHmmss"
                 let folder = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: ".")
                 let size = (arguments.string("size") ?? "1920x1080").split(separator: "x").compactMap { Int($0) }
                 guard size.count == 2, size.allSatisfy({ (64...4096).contains($0) && $0 % 2 == 0 }) else {
                     throw DuoError.render("--size takes a width and a height, both even, such as 1920x1080")
                 }
-                movie = (arguments.string("out").map { URL(fileURLWithPath: $0) } ?? folder.appendingPathComponent("duorex-\(stamp).mp4"), size[0], size[1])
+                movie = (arguments.string("out").map { URL(fileURLWithPath: $0) } ?? folder.appendingPathComponent("duorex-\(stamp.string(from: Date())).mp4"), size[0], size[1])
             }
             let running = try Session(scene: try await scene(), movie: movie)
             session = running
