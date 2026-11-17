@@ -83,6 +83,10 @@ duorex film --out launch.mp4 --size 1080x1080
 
 duorex first takes three pictures of your app from the simulator: shut, open and half open. Then it draws the film at its own pace, so each of its 600 pictures is in the movie. The whole run takes about 20 seconds, and the simulator is put back.
 
+## Draw it as lines
+
+`x` draws the device as a wireframe, with its screens still lit. `--wireframe` does the same for `record`, `strobe` and `film`.
+
 ## It stays in its pane
 
 duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
@@ -160,6 +164,7 @@ Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and
 - `r` rotates, `h` goes home, `q` quits.
 - `d` switches dark mode. `+` and `-` change the text size. `s` slows the animations. `w` sends a memory warning.
 - `m` turns the fold sounds off or on.
+- `x` switches between the solid device and the wireframe.
 - `?` shows the keys, a few at a time.
 
 The first time duorex runs in a terminal, move the pointer over the pane once. That tells duorex where the pane is on screen.
