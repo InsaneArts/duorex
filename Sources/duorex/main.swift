@@ -46,6 +46,10 @@ func scene() async throws -> DuoScene {
 
 // The run loop must own the main thread: started from inside a task, it would never drain the main queue.
 switch arguments.command {
+case "version":
+    print(Release.version)
+case "update":
+    Release.update()
 case "snapshot":
     Task {
         do {
@@ -78,6 +82,6 @@ case "view":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex snapshot [--hinge deg] [--yaw deg] [--pitch deg] [--roll deg] [--pattern] [--out file.png]\n".utf8))
+    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex update\n       duorex version\n".utf8))
     exit(2)
 }
