@@ -9,8 +9,7 @@ final class MarkLayer {
 
     private let mesh = MeshResource.generatePlane(width: 1, height: 1)
     /// The two looks of a mark. A material is slow to make and fast to copy, so they are made once.
-    private let spot: UnlitMaterial
-    private let ring: UnlitMaterial
+    private let looks: [Mark.Look: UnlitMaterial]
     /// The discs are kept and used again. More are made when a frame needs more.
     private var discs: [ModelEntity] = []
     /// The discs draw in the order of the marks, each over the ones before it, however near they are.
@@ -23,7 +22,7 @@ final class MarkLayer {
     private static let accent = CGColor(srgbRed: 1, green: 0.4, blue: 0.08, alpha: 1)
 
     init() throws {
-        spot = try Self.material { context, size in
+        let spot = try Self.material { context, size in
             // A white rim inside a dark edge keeps the spot readable on any screen, light or dark.
             let whole = CGRect(x: 0, y: 0, width: size, height: size)
             context.setFillColor(CGColor(gray: 0, alpha: 0.25))
@@ -33,7 +32,7 @@ final class MarkLayer {
             context.setFillColor(Self.accent)
             context.fillEllipse(in: whole.insetBy(dx: size * 0.15, dy: size * 0.15))
         }
-        ring = try Self.material { context, size in
+        let ring = try Self.material { context, size in
             let circle = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.09, dy: size * 0.09)
             context.setStrokeColor(CGColor(gray: 0, alpha: 0.2))
             context.setLineWidth(size * 0.13)
@@ -42,6 +41,16 @@ final class MarkLayer {
             context.setLineWidth(size * 0.08)
             context.strokeEllipse(in: circle)
         }
+        let finger = try Self.material { context, size in
+            // Pale and half clear, so the user sees what is under a finger of their own.
+            let whole = CGRect(x: 0, y: 0, width: size, height: size)
+            context.setFillColor(CGColor(gray: 0, alpha: 0.3))
+            context.fillEllipse(in: whole.insetBy(dx: size * 0.02, dy: size * 0.02))
+            context.setBlendMode(.copy)
+            context.setFillColor(CGColor(gray: 1, alpha: 0.6))
+            context.fillEllipse(in: whole.insetBy(dx: size * 0.08, dy: size * 0.08))
+        }
+        looks = [.spot: spot, .ring: ring, .finger: finger]
     }
 
     /// Draws `marks` on the screen whose leaves are `leaves`. Each call replaces the marks of the call before.
@@ -80,7 +89,7 @@ final class MarkLayer {
                 let center = place.point + place.down * ((low + high) / 2 - middle.y)
                 disc.transform = Transform(scale: SIMD3(radius * 2, (high - low) * simd_length(place.down), 1), rotation: rotation,
                                            translation: center + facing * Self.lift)
-                var material = mark.isRing ? ring : spot
+                var material = looks[mark.look]!
                 material.blending = .transparent(opacity: .init(floatLiteral: Float(mark.opacity)))
                 // The part shows its share of the picture, counted from the picture's top.
                 let share = (high - low) / (reach * 2)

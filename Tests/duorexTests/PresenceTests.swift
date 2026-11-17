@@ -10,7 +10,7 @@ private let there = CGPoint(x: 0.8, y: 0.2)
     presence.saw(.tap(here), time: 10)
     let early = presence.step(to: 10.05), late = presence.step(to: 10.4)
     #expect(early.map(\.point) == [here, here])
-    #expect(early.map(\.isRing) == [false, true])
+    #expect(early.map(\.look) == [.spot, .ring])
     // The ring grows and fades. The spot keeps its size.
     #expect(late[1].radius > early[1].radius)
     #expect(late[1].opacity < early[1].opacity)
@@ -34,7 +34,7 @@ private let there = CGPoint(x: 0.8, y: 0.2)
     // On the way: a trail behind the finger, and no ring yet.
     let onTheWay = presence.step(to: 10.1)
     #expect(onTheWay.count > 3)
-    #expect(onTheWay.allSatisfy { !$0.isRing })
+    #expect(onTheWay.allSatisfy { $0.look == .spot })
     #expect(onTheWay.first?.point == here)
     let finger = onTheWay.last!
     #expect(finger.point.x > here.x && finger.point.x < there.x)
@@ -42,7 +42,7 @@ private let there = CGPoint(x: 0.8, y: 0.2)
     #expect(onTheWay.dropLast().map(\.radius) == onTheWay.dropLast().map(\.radius).sorted())
     // Arrived: the finger's spot is at the end, with the ring.
     let arrived = presence.step(to: 10.3)
-    #expect(arrived.last == Mark(point: there, radius: arrived.last!.radius, opacity: arrived.last!.opacity, isRing: true))
+    #expect(arrived.last == Mark(point: there, radius: arrived.last!.radius, opacity: arrived.last!.opacity, look: .ring))
     #expect(arrived.dropLast().last?.point == there)
     #expect(presence.step(to: 10.71).isEmpty)
 }
