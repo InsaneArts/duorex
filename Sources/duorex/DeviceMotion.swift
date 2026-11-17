@@ -29,6 +29,8 @@ nonisolated struct DeviceMotion {
         case touch(TouchPhase, CGPoint)
         /// A finger that the scroll wheel moves. Unlike a touch, it never counts as an edge swipe.
         case scroll(TouchPhase, CGPoint)
+        /// Two fingers on the lit screen, at framebuffer points.
+        case pinch(TouchPhase, CGPoint, CGPoint)
         /// The user moved the hinge to this angle.
         case hinge(Double)
         /// The user pressed a hardware button, or let it go.
@@ -38,6 +40,7 @@ nonisolated struct DeviceMotion {
     private enum Grab {
         case none
         case touch
+        case pinch
         case tilt(from: CGPoint, yaw: Double, pitch: Double)
         case fold(from: CGPoint, hinge: Double, sign: Double)
         case button(HardwareButton)
@@ -65,6 +68,9 @@ nonisolated struct DeviceMotion {
 
     /// The hardware button under a pointer that is not pressed.
     private(set) var hoveredButton: HardwareButton?
+    /// The two fingers of a pinch, as framebuffer points: while the user pinches, and before
+    /// that while the pointer rests on the glass with Option held.
+    private(set) var fingers: [CGPoint] = []
 
     var pose: Pose {
         Pose(hinge: hinge.value, roll: roll.value, yaw: yaw.value, pitch: pitch.value,
@@ -106,16 +112,19 @@ nonisolated struct DeviceMotion {
         // A press while one is still held means the terminal lost the release. End the held one first.
         var effects = isDragging ? pointerUp(at: point, probe: probe) : []
         effects += liftWheelFinger()
+        fingers = []
         let under = probe(point)
         if !option, let button = under.button {
             grab = .button(button)
             pushed = button
             press.target = 1
             effects.append(.button(button, pressed: true))
-        } else if !option, let glass = under.glass {
-            grab = .touch
+        } else if let glass = under.glass {
+            // With Option, the pointer is one of two fingers. The other mirrors it about the middle of the screen.
+            grab = option ? .pinch : .touch
+            if option { fingers = Self.pinch(at: glass) }
             lastTouch = glass
-            effects.append(.touch(.begin, glass))
+            effects.append(option ? .pinch(.begin, glass, fingers[1]) : .touch(.begin, glass))
         } else if option || under.onFrame {
             // Pulling the leaf that moves closes it toward the other. Pulling the fixed leaf mirrors that.
             let center = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
@@ -128,18 +137,25 @@ nonisolated struct DeviceMotion {
         return effects
     }
 
-    mutating func pointerMoved(to point: CGPoint, probe: (CGPoint) -> Probe) -> [Effect] {
+    mutating func pointerMoved(to point: CGPoint, option: Bool = false, probe: (CGPoint) -> Probe) -> [Effect] {
         switch grab {
         case .none:
             // A little parallax toward the pointer keeps the device feeling like an object.
             lastHover = time
-            hoveredButton = probe(point).button
+            let under = probe(point)
+            hoveredButton = under.button
+            fingers = option ? under.glass.map(Self.pinch) ?? [] : []
             yaw.target = (Double(point.x / viewSize.width) - 0.5) * 9
             pitch.target = (Double(point.y / viewSize.height) - 0.5) * 6
         case .touch:
             guard let nearest = probe(point).nearest else { return [] }
             lastTouch = nearest
             return [.touch(.move, nearest)]
+        case .pinch:
+            guard let nearest = probe(point).nearest else { return [] }
+            lastTouch = nearest
+            fingers = Self.pinch(at: nearest)
+            return [.pinch(.move, nearest, fingers[1])]
         case .tilt(let from, let startYaw, let startPitch):
             yaw.hold(rubberBand(startYaw + Double(point.x - from.x) * 0.35, limit: 55))
             pitch.hold(rubberBand(startPitch + Double(point.y - from.y) * 0.35, limit: 35))
@@ -159,6 +175,9 @@ nonisolated struct DeviceMotion {
         switch grab {
         case .touch:
             if let end = probe(point).nearest ?? lastTouch { effects.append(.touch(.end, end)) }
+        case .pinch:
+            if let end = probe(point).nearest ?? lastTouch { effects.append(.pinch(.end, end, Self.pinch(at: end)[1])) }
+            fingers = []
         case .fold:
             // Close enough to shut or flat finishes the move.
             if hinge.value < 14 { hinge.target = 0 } else if hinge.value > 166 { hinge.target = 180 }
@@ -178,6 +197,7 @@ nonisolated struct DeviceMotion {
     mutating func pointerLeft() {
         lastHover = -.infinity
         hoveredButton = nil
+        if case .none = grab { fingers = [] }
     }
 
     /// One wheel step. Positive `lines` scrolls the content down, as a finger moving up does.
@@ -222,6 +242,11 @@ nonisolated struct DeviceMotion {
         guard wheel != nil else { return [] }
         wheel = nil
         return lastTouch.map { [.scroll(.end, $0)] } ?? []
+    }
+
+    /// The two fingers of a pinch with one of them at `point`, a framebuffer point.
+    private static func pinch(at point: CGPoint) -> [CGPoint] {
+        [point, CGPoint(x: 1 - point.x, y: 1 - point.y)]
     }
 
     /// How far `point` lies from `origin` along the device's width, which turns with the roll.
