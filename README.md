@@ -57,6 +57,21 @@ duorex record                                   # saves to ~/Movies/duorex-<time
 duorex record --out demo.mp4 --size 1080x1080
 ```
 
+## Make a poster
+
+`duorex strobe` saves one still picture of the device as it folds, like a strobe photo. The half that lies still shows your app, and the other half shows at seven angles, from flat to upright.
+
+```sh
+duorex strobe                                    # saves duorex-strobe.png, 2560 by 1440
+duorex strobe --out poster.png --size 3840x2160
+```
+
+<p align="center">
+  <img src=".github/assets/strobe.png" width="100%" alt="An iPhone Duo on a dark stage. One half lies flat with Settings on it, and the other half stands upright, with fainter pictures of it at five angles on its way up" />
+</p>
+
+The picture shows the app as it is on the open device. If the simulator is shut, duorex opens it for the picture and puts it back.
+
 ## It stays in its pane
 
 duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
