@@ -159,8 +159,6 @@ final class Session {
             }
         case .resized:
             paneResized()
-        case .focus:
-            break
         }
     }
 

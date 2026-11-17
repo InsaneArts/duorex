@@ -7,18 +7,9 @@ nonisolated let log = Logger(subsystem: "duorex", category: "app")
 /// The terminal pane duorex runs in. The terminal owns the pointer and the keyboard,
 /// and reports both here: pointer positions arrive in pixels from the pane's top left.
 final class Pane {
-    struct Pointer {
-        enum Kind { case down, up, move, drag, wheel(lines: Double) }
-        var kind: Kind
-        /// Pixels from the pane's top left corner.
-        var x: Double, y: Double
-        var option: Bool
-    }
-
     enum Event {
-        case pointer(Pointer)
+        case pointer(TerminalInput.Pointer)
         case key(Character)
-        case focus(Bool)
         case resized
     }
 
@@ -31,15 +22,15 @@ final class Pane {
     private(set) var size = Size()
 
     private var original = termios()
-    private var input: DispatchSourceRead?
-    private var resize: DispatchSourceSignal?
-    private var buffer = [UInt8]()
+    private var input = TerminalInput()
+    private var reads: DispatchSourceRead?
+    private var resizes: DispatchSourceSignal?
     private var restored = false
 
     /// Fails when duorex is not attached to a terminal.
     init() throws {
         guard isatty(STDIN_FILENO) == 1, isatty(STDOUT_FILENO) == 1, tcgetattr(STDIN_FILENO, &original) == 0 else {
-            throw DuoError.sim("duorex draws over a terminal pane. Run it inside Rex.")
+            throw DuoError.terminal("duorex draws over a terminal pane. Run it inside Rex.")
         }
     }
 
@@ -47,23 +38,23 @@ final class Pane {
         var raw = original
         cfmakeraw(&raw)
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw)
-        // Alternate screen, no cursor, pointer motion in pixels (1003 + 1006 + 1016), focus reports.
-        write("\u{1B}[?1049h\u{1B}[?25l\u{1B}[?1003h\u{1B}[?1006h\u{1B}[?1016h\u{1B}[?1004h\u{1B}[2J")
+        // Alternate screen, no cursor, and pointer motion reported in pixels (1003 + 1006 + 1016).
+        write("\u{1B}[?1049h\u{1B}[?25l\u{1B}[?1003h\u{1B}[?1006h\u{1B}[?1016h\u{1B}[2J")
         _ = fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK)
 
-        let input = DispatchSource.makeReadSource(fileDescriptor: STDIN_FILENO, queue: .main)
-        input.setEventHandler { [weak self] in self?.readInput() }
-        input.resume()
-        self.input = input
+        let reads = DispatchSource.makeReadSource(fileDescriptor: STDIN_FILENO, queue: .main)
+        reads.setEventHandler { [weak self] in self?.readInput() }
+        reads.resume()
+        self.reads = reads
 
         signal(SIGWINCH, SIG_IGN)
-        let resize = DispatchSource.makeSignalSource(signal: SIGWINCH, queue: .main)
-        resize.setEventHandler { [weak self] in
+        let resizes = DispatchSource.makeSignalSource(signal: SIGWINCH, queue: .main)
+        resizes.setEventHandler { [weak self] in
             self?.measure()
             self?.onEvent?(.resized)
         }
-        resize.resume()
-        self.resize = resize
+        resizes.resume()
+        self.resizes = resizes
         measure()
     }
 
@@ -71,8 +62,8 @@ final class Pane {
     func restore() {
         guard !restored else { return }
         restored = true
-        input?.cancel()
-        write("\u{1B}[?1004l\u{1B}[?1016l\u{1B}[?1006l\u{1B}[?1003l\u{1B}[?25h\u{1B}[?1049l")
+        reads?.cancel()
+        write("\u{1B}[?1016l\u{1B}[?1006l\u{1B}[?1003l\u{1B}[?25h\u{1B}[?1049l")
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &original)
     }
 
@@ -109,70 +100,22 @@ final class Pane {
     }
 
     private func readInput() {
+        var bytes: [UInt8] = []
         var chunk = [UInt8](repeating: 0, count: 4096)
         while true {
             let count = read(STDIN_FILENO, &chunk, chunk.count)
             guard count > 0 else { break }
-            buffer.append(contentsOf: chunk[..<count])
+            bytes.append(contentsOf: chunk[..<count])
         }
-        parse()
-    }
-
-    private func parse() {
-        var index = 0
-        while index < buffer.count {
-            guard buffer[index] == 0x1B else {
-                // Plain bytes are keys. Multi-byte characters are not needed for shortcuts.
-                if buffer[index] < 0x80 { onEvent?(.key(Character(UnicodeScalar(buffer[index])))) }
-                index += 1
-                continue
+        for event in input.read(bytes) {
+            switch event {
+            case .key(let key): onEvent?(.key(key))
+            case .pointer(let pointer): onEvent?(.pointer(pointer))
+            case .textArea(let width, let height):
+                size.pixelWidth = width
+                size.pixelHeight = height
+                onEvent?(.resized)
             }
-            guard index + 1 < buffer.count else {
-                onEvent?(.key("\u{1B}"))
-                index += 1
-                continue
-            }
-            guard buffer[index + 1] == UInt8(ascii: "[") else {
-                index += 2   // an Alt chord or an SS3 key: not used
-                continue
-            }
-            // A control sequence runs to its final byte, 0x40...0x7E.
-            guard let end = buffer[(index + 2)...].firstIndex(where: { (0x40...0x7E).contains($0) }) else { break }
-            let body = String(decoding: buffer[(index + 2)..<end], as: UTF8.self)
-            control(body, final: buffer[end])
-            index = end + 1
-        }
-        buffer.removeFirst(min(index, buffer.count))
-    }
-
-    private func control(_ body: String, final: UInt8) {
-        switch final {
-        case UInt8(ascii: "I"): onEvent?(.focus(true))
-        case UInt8(ascii: "O"): onEvent?(.focus(false))
-        case UInt8(ascii: "t"):
-            let parts = body.split(separator: ";").compactMap { Int($0) }
-            guard parts.count == 3, parts[0] == 4 else { return }
-            size.pixelHeight = parts[1]
-            size.pixelWidth = parts[2]
-            onEvent?(.resized)
-        case UInt8(ascii: "M"), UInt8(ascii: "m"):
-            guard body.hasPrefix("<") else { return }
-            let parts = body.dropFirst().split(separator: ";").compactMap { Int($0) }
-            guard parts.count == 3 else { return }
-            let code = parts[0]
-            let kind: Pointer.Kind
-            if code & 64 != 0 {
-                guard code & 3 < 2 else { return }   // horizontal wheel: not used
-                kind = .wheel(lines: code & 3 == 0 ? -1 : 1)
-            } else if code & 32 != 0 {
-                kind = code & 3 == 3 ? .move : .drag
-            } else {
-                guard code & 3 == 0 else { return }  // left button only
-                kind = final == UInt8(ascii: "M") ? .down : .up
-            }
-            onEvent?(.pointer(Pointer(kind: kind, x: Double(parts[1]), y: Double(parts[2]), option: code & 8 != 0)))
-        default:
-            break
         }
     }
 }
