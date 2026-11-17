@@ -2,6 +2,10 @@
 
 <h3 align="center">A real iPhone Duo in your terminal pane.</h3>
 
+<p align="center">
+  <img src=".github/assets/hero.png" width="100%" alt="An iPhone Duo folded like a book, with the Photos app open across both halves of its inner screen" />
+</p>
+
 duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. The device is Apple's own model from Xcode, and its screens are the live simulator. You fold it with your pointer, and your agent can use the same device while you watch.
 
 ## Fold it like the real thing
@@ -35,6 +39,15 @@ duorex sweep --out sweep.png
 </p>
 
 It takes about 20 seconds and puts the simulator back the way it was. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
+
+## Record a clean clip
+
+`duorex record` shows the device as usual and records everything you do with it, until you press `q`. The movie shows the device alone on a dark stage, lit by its own screens, at 1920 by 1080 and up to 60 frames a second. The picture at the top of this page is a frame from one.
+
+```sh
+duorex record                                   # saves to ~/Movies/duorex-<time>.mp4
+duorex record --out demo.mp4 --size 1080x1080
+```
 
 ## It stays in its pane
 
