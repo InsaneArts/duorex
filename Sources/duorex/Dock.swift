@@ -17,17 +17,17 @@ final class Dock {
     }
 
     let stage: StageView
-    var placement = Placement() { didSet { if placement != oldValue { predictOrigin() } } }
+    var placement = Placement() { didSet { if placement.rect != oldValue.rect { layoutChanged() } } }
 
     private let panel: NSPanel
     private var host: (window: CGWindowID, pid: pid_t)?
     private var hostBounds = CGRect.zero
-    /// The pane's top left corner inside the host window, in points.
-    private var origin: CGPoint?
+    /// Set when the host is known by its app, as Rex is. The pane is then only looked for in that app.
+    private var pinnedHost: pid_t?
+    private var locator = PaneLocator()
     private var paneSize = CGSize.zero
     /// Window chrome above and to the right of the pane area, learned from pointer reports.
     private var chrome: (top: CGFloat, right: CGFloat)?
-    private var lastPointer = CGPoint.zero
     private var timer: Timer?
     private var activation: NSObjectProtocol?
 
@@ -46,10 +46,12 @@ final class Dock {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.contentView = stage
 
-        let app = hostBundleID.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first } ?? NSWorkspace.shared.frontmostApplication
-        if let app, let window = Self.frontWindow(of: app.processIdentifier) {
+        let known = hostBundleID.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first }
+        pinnedHost = known?.processIdentifier
+        if let app = known ?? NSWorkspace.shared.frontmostApplication, let window = Self.frontWindow(of: app.processIdentifier) {
             host = (window.id, app.processIdentifier)
             hostBounds = window.bounds
+            updateScale()
             let saved = UserDefaults.standard.array(forKey: Self.chromeKey(app.processIdentifier)) as? [Double]
             if let saved, saved.count == 2 { chrome = (CGFloat(saved[0]), CGFloat(saved[1])) }
         }
@@ -65,28 +67,30 @@ final class Dock {
 
     /// The pane's size changed. Sizes are in pixels, as the terminal reports them.
     func paneResized(pixelWidth: Int, pixelHeight: Int) {
-        paneSize = CGSize(width: CGFloat(pixelWidth) / scale, height: CGFloat(pixelHeight) / scale)
-        predictOrigin()
+        let size = CGSize(width: CGFloat(pixelWidth) / scale, height: CGFloat(pixelHeight) / scale)
+        guard size != paneSize else { return }
+        paneSize = size
+        layoutChanged()
     }
+
+    /// Whether a pane position is inside the pane, and not on the edge the terminal clamps to.
+    func contains(_ local: CGPoint) -> Bool { PaneLocator.isInside(local, paneSize: paneSize) }
 
     /// The terminal reported the pointer at `local`, in points from the pane's top left.
     func pointerSeen(at local: CGPoint) {
         let pointer = Self.pointerLocation()
-        defer { lastPointer = pointer }
-        guard let window = Self.window(under: pointer, excluding: getpid()) else {
-            log.info("no host window under the pointer at \(pointer.x, format: .fixed(precision: 0)), \(pointer.y, format: .fixed(precision: 0))")
-            return
-        }
-        // A report lags the pointer by a few milliseconds, so only a slow pointer gives a true origin.
-        let slow = hypot(pointer.x - lastPointer.x, pointer.y - lastPointer.y) < 1.5
-        guard origin == nil || host?.window != window.id || slow else { return }
+        guard locator.wants(local: local, pointer: pointer, paneSize: paneSize, time: CACurrentMediaTime()),
+              let window = Self.window(under: pointer, excluding: getpid()) else { return }
+        // A found pane can move to another window of its app, but never to another app.
+        if let expected = locator.isMeasured ? host?.pid : pinnedHost, window.pid != expected { return }
+        if window.id != host?.window { locator.layoutChanged(predicted: nil) }
         host = (window.id, window.pid)
         hostBounds = window.bounds
-        updateScale()
-        let measured = CGPoint(x: pointer.x - local.x - window.bounds.minX, y: pointer.y - local.y - window.bounds.minY)
-        if let origin, hypot(origin.x - measured.x, origin.y - measured.y) < 1 { return }
-        origin = measured
-        log.info("pane origin in window: \(measured.x, format: .fixed(precision: 1)), \(measured.y, format: .fixed(precision: 1))")
+        // On a screen with another scale, `local` was converted with the wrong one. The next report is right.
+        guard !updateScale() else { return }
+        guard locator.measure(CGPoint(x: pointer.x - local.x - window.bounds.minX, y: pointer.y - local.y - window.bounds.minY)),
+              let origin = locator.origin else { return }
+        log.info("pane origin in window: \(origin.x, format: .fixed(precision: 1)), \(origin.y, format: .fixed(precision: 1))")
         learnChrome()
         follow()
     }
@@ -94,19 +98,17 @@ final class Dock {
     // MARK: Following
 
     private func follow() {
-        guard let host, origin != nil, paneSize.width > 1, placement.shown,
+        guard let host, locator.origin != nil, paneSize.width > 1, placement.shown,
               let info = Self.describe(host.window), info.onScreen,
               placement.titleSuffix.map({ suffix in info.title.map { $0.hasSuffix(suffix) } ?? true }) ?? true
         else {
             if panel.isVisible { panel.orderOut(nil) }
             return
         }
-        if info.bounds.size != hostBounds.size {
-            hostBounds = info.bounds
-            predictOrigin()
-        }
+        let resized = info.bounds.size != hostBounds.size
         hostBounds = info.bounds
-        guard let origin else { return }
+        if resized { layoutChanged() }
+        guard let origin = locator.origin else { return }
         let top = hostBounds.minY + origin.y
         let frame = CGRect(x: hostBounds.minX + origin.x, y: Self.primaryHeight() - top - paneSize.height,
                            width: paneSize.width, height: paneSize.height)
@@ -133,18 +135,24 @@ final class Dock {
 
     // MARK: Predicting the origin
 
-    /// The pane area is the window minus its chrome. With the chrome known, a new window size,
-    /// pane size or layout gives the new origin without waiting for the pointer.
-    private func predictOrigin() {
-        guard let chrome, paneSize.width > 1, hostBounds.width > 1, placement.rect.width > 0, placement.rect.height > 0 else { return }
+    /// The window, the pane or the layout changed. The measured origin no longer holds, so the
+    /// device goes where the chrome predicts until the pointer gives a new measurement.
+    private func layoutChanged() {
+        locator.layoutChanged(predicted: predictedOrigin())
+    }
+
+    /// The pane area is the window minus its chrome. With the chrome known, the window size,
+    /// pane size and layout give the origin without waiting for the pointer.
+    private func predictedOrigin() -> CGPoint? {
+        guard let chrome, paneSize.width > 1, hostBounds.width > 1, placement.rect.width > 0, placement.rect.height > 0 else { return nil }
         let areaWidth = paneSize.width / placement.rect.width
         let areaHeight = paneSize.height / placement.rect.height
         let areaLeft = hostBounds.width - chrome.right - areaWidth
-        origin = CGPoint(x: areaLeft + placement.rect.minX * areaWidth, y: chrome.top + placement.rect.minY * areaHeight)
+        return CGPoint(x: areaLeft + placement.rect.minX * areaWidth, y: chrome.top + placement.rect.minY * areaHeight)
     }
 
     private func learnChrome() {
-        guard let origin, let host, paneSize.width > 1, placement.rect.width > 0, placement.rect.height > 0 else { return }
+        guard let origin = locator.origin, let host, paneSize.width > 1, placement.rect.width > 0, placement.rect.height > 0 else { return }
         let areaWidth = paneSize.width / placement.rect.width
         let areaHeight = paneSize.height / placement.rect.height
         let top = origin.y - placement.rect.minY * areaHeight
@@ -153,11 +161,14 @@ final class Dock {
         UserDefaults.standard.set([Double(top), Double(right)], forKey: Self.chromeKey(host.pid))
     }
 
-    private func updateScale() {
+    /// Takes the scale of the screen the host window is on. Returns true when it changed.
+    @discardableResult
+    private func updateScale() -> Bool {
         let center = CGPoint(x: hostBounds.midX, y: Self.primaryHeight() - hostBounds.midY)
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }), screen.backingScaleFactor != scale else { return }
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }), screen.backingScaleFactor != scale else { return false }
         paneSize = CGSize(width: paneSize.width * scale / screen.backingScaleFactor, height: paneSize.height * scale / screen.backingScaleFactor)
         scale = screen.backingScaleFactor
+        return true
     }
 
     // MARK: Window server

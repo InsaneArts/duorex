@@ -135,6 +135,14 @@ final class StageView: NSView {
 
     // MARK: Pointer
 
+    /// True while a press that began on the device is still held.
+    var isDragging: Bool {
+        if case .none = grab { false } else { true }
+    }
+
+    /// The pointer left the pane, so the device stops turning toward it.
+    func pointerLeft() { lastHover = .distantPast }
+
     func pointerDown(at point: CGPoint, option: Bool) {
         endScroll()
         if !option, let hit = scene.screenHit(at: unit(point), panel: activePanel) {

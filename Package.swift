@@ -12,6 +12,11 @@ let package = Package(
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
                 .enableUpcomingFeature("InferIsolatedConformances"),
             ]
-        )
+        ),
+        .testTarget(
+            name: "duorexTests",
+            dependencies: ["duorex"],
+            swiftSettings: [.defaultIsolation(MainActor.self)]
+        ),
     ]
 )

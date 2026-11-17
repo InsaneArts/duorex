@@ -146,6 +146,12 @@ final class Session {
         case .pointer(let pointer):
             let point = CGPoint(x: pointer.x / dock.scale, y: pointer.y / dock.scale)
             dock.pointerSeen(at: point)
+            // Rex reports the pointer to this pane even when it is over another one, clamped to
+            // this pane's edge. Out there, only a drag that began on the device may continue.
+            guard dock.contains(point) || stage.isDragging else {
+                stage.pointerLeft()
+                return
+            }
             switch pointer.kind {
             case .down: stage.pointerDown(at: point, option: pointer.option)
             case .move, .drag: stage.pointerMoved(to: point)
