@@ -209,14 +209,19 @@ final class DuoScene {
                      onFrame: !onGlass && nearest.outside <= Self.frameWidth, button: onGlass ? nil : button)
     }
 
-    /// Backs the camera off so the device fills the view at any tilt, and closes in as it folds.
+    /// Backs the camera off until the device, as it is folded and turned now, just fits the view.
+    /// The camera follows a fold or a turn, so the device stays as large as the view allows.
     private func frameCamera() {
         let open = Float(min(max(pose.hinge, 0), 180) / 180)
-        let width = flatBounds.extents.x * (0.5 + 0.5 * open)
-        let radius = simd_length(SIMD2(width, flatBounds.extents.y)) / 2
-        let vertical = fieldOfView * .pi / 360
-        let narrow = aspect >= 1 ? vertical : atan(tan(vertical) * aspect)
-        camera.position = [0, 0, radius * 1.12 / sin(narrow)]
+        let width = flatBounds.extents.x * (0.5 + 0.5 * open), height = flatBounds.extents.y
+        // The box the device covers once it is turned about the view axis.
+        let turn = Float(pose.roll * .pi / 180)
+        let across = abs(cos(turn)) * width + abs(sin(turn)) * height
+        let up = abs(sin(turn)) * width + abs(cos(turn)) * height
+        let tangent = tan(fieldOfView * .pi / 360)
+        // The margin leaves room for a tilt. Half folded, a leaf swings toward the camera and looks larger.
+        let margin = 1.22 + 0.16 * sin(open * .pi)
+        camera.position = [0, 0, max(up / 2 / tangent, across / 2 / (tangent * aspect)) * margin]
     }
 
     /// The joints part of the way from one pose to another.
