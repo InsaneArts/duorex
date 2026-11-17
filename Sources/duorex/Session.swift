@@ -11,6 +11,10 @@ final class Session {
     private var sync = PoseSync()
     private var signals: [DispatchSourceSignal] = []
     private var status = "starting the simulator…"
+    /// The hardware button under the pointer.
+    private var hovered: HardwareButton?
+    /// What another client of the simulator does now.
+    private var activity: SimWire.Activity?
     /// How the interface is turned inside the lit panel's framebuffer.
     private var interface = Orientation.portrait
     /// The edge tag of the touch in progress, when it began as the swipe home.
@@ -108,7 +112,13 @@ final class Session {
         }
         // The buttons are small. Naming the one under the pointer shows where they are.
         stage.onHover = { [unowned self] button in
-            pane.caption(button.map { "\($0.rawValue) button" } ?? status)
+            hovered = button
+            caption()
+        }
+        sim.onActivity = { [unowned self] activity in stage.saw(activity) }
+        stage.onActivity = { [unowned self] activity in
+            self.activity = activity
+            caption()
         }
         sim.start()
     }
@@ -116,7 +126,18 @@ final class Session {
     /// Shows a line of text under the device.
     func show(_ status: String) {
         self.status = status
-        pane.caption(status)
+        caption()
+    }
+
+    /// Writes the line under the device: the button under the pointer, or what an agent does, or the status.
+    private func caption() {
+        if let hovered {
+            pane.caption("\(hovered.rawValue) button")
+        } else if let activity {
+            pane.caption("● agent  ·  \(Presence.words(for: activity, interface: interface))", accent: true)
+        } else {
+            pane.caption(status)
+        }
     }
 
     /// Does what the sync decided about a hinge angle from the simulator.
@@ -182,7 +203,7 @@ final class Session {
     private func paneResized() {
         log.info("pane \(self.pane.size.columns)x\(self.pane.size.rows) cells, \(self.pane.size.pixelWidth)x\(self.pane.size.pixelHeight) px")
         dock.paneResized(pixelWidth: pane.size.pixelWidth, pixelHeight: pane.size.pixelHeight)
-        pane.caption(status)
+        caption()
     }
 
     private func quit() {

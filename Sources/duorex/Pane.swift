@@ -79,11 +79,12 @@ final class Pane {
         }
     }
 
-    /// Draws one dim line of text centered in the pane, under the device.
-    func caption(_ text: String) {
+    /// Draws one line of text centered in the pane, under the device. It is dim, or in the
+    /// colour of an agent's touches when `accent` is true.
+    func caption(_ text: String, accent: Bool = false) {
         guard size.rows > 0 else { return }
         let column = max(1, (size.columns - text.count) / 2 + 1)
-        write("\u{1B}[2J\u{1B}[\(size.rows);\(column)H\u{1B}[2m\(text)\u{1B}[0m")
+        write("\u{1B}[2J\u{1B}[\(size.rows);\(column)H\u{1B}[\(accent ? "38;2;255;102;20" : "2")m\(text)\u{1B}[0m")
     }
 
     private func measure() {
