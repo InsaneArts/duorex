@@ -46,12 +46,17 @@ nonisolated struct DeviceMotion {
         case button(HardwareButton)
     }
 
+    /// How the device settles after a small tilt: with a little bounce, like an object.
+    private static let bounce = 0.55
+    /// Degrees the device turns for each point of a drag on the background.
+    private static let turn = 0.5
+
     /// The size of the view the pointer moves in, in points.
     var viewSize = CGSize(width: 1, height: 1)
 
     private var hinge = Spring(180, response: 0.55, damping: 0.9)
-    private var yaw = Spring(0, response: 0.5, damping: 0.55)
-    private var pitch = Spring(0, response: 0.5, damping: 0.55)
+    private var yaw = Spring(0, response: 0.5, damping: bounce)
+    private var pitch = Spring(0, response: 0.5, damping: bounce)
     private var roll = Spring(0, response: 0.45, damping: 0.8)
     /// How far in the pushed button is: 0 is out, 1 is fully in. A button travels fast.
     private var press = Spring(0, response: 0.13, damping: 0.7)
@@ -65,6 +70,8 @@ nonisolated struct DeviceMotion {
     /// False while the hinge follows the simulator, so that motion is not sent back to it.
     private var userOwnsHinge = true
     private var time = 0.0
+    /// True while the device turns back to the front from far away.
+    private var comingBack = false
 
     /// The hardware button under a pointer that is not pressed.
     private(set) var hoveredButton: HardwareButton?
@@ -157,8 +164,9 @@ nonisolated struct DeviceMotion {
             fingers = Self.pinch(at: nearest)
             return [.pinch(.move, nearest, fingers[1])]
         case .tilt(let from, let startYaw, let startPitch):
-            yaw.hold(rubberBand(startYaw + Double(point.x - from.x) * 0.35, limit: 55))
-            pitch.hold(rubberBand(startPitch + Double(point.y - from.y) * 0.35, limit: 35))
+            // No limit: a long drag turns the device round, and the user sees its back.
+            yaw.hold(startYaw + Double(point.x - from.x) * Self.turn)
+            pitch.hold(startPitch + Double(point.y - from.y) * Self.turn)
         case .fold(let from, let start, let sign):
             // The hinge crosses the device, so the fold follows the pointer along the device's width.
             let turn = roll.value * .pi / 180
@@ -184,7 +192,17 @@ nonisolated struct DeviceMotion {
         case .button(let button):
             press.target = 0
             effects.append(.button(button, pressed: false))
-        case .tilt, .none:
+        case .tilt:
+            // Back to the front by the shorter way. A small tilt bounces back. From far away,
+            // the same bounce would swing the device well past the front.
+            yaw.hold(Self.shorterWay(yaw.value))
+            pitch.hold(Self.shorterWay(pitch.value))
+            comingBack = max(abs(yaw.value), abs(pitch.value)) > 30
+            if comingBack {
+                yaw.damping = 0.95
+                pitch.damping = 0.95
+            }
+        case .none:
             break
         }
         grab = .none
@@ -229,7 +247,13 @@ nonisolated struct DeviceMotion {
             yaw.target = 0
             pitch.target = 0
         }
-        let moving = [hinge.step(elapsed), yaw.step(elapsed), pitch.step(elapsed), roll.step(elapsed), press.step(elapsed)].contains(true)
+        let turning = [yaw.step(elapsed), pitch.step(elapsed)].contains(true)
+        if comingBack, !turning {
+            comingBack = false
+            yaw.damping = Self.bounce
+            pitch.damping = Self.bounce
+        }
+        let moving = [turning, hinge.step(elapsed), roll.step(elapsed), press.step(elapsed)].contains(true)
         if press.value == 0, press.target == 0 { pushed = nil }
         if userOwnsHinge, abs(hinge.value - reportedHinge) >= 0.5 || (!moving && hinge.value != reportedHinge) {
             reportedHinge = hinge.value
@@ -255,10 +279,9 @@ nonisolated struct DeviceMotion {
         return Double(point.x - origin.x) * cos(turn) - Double(point.y - origin.y) * sin(turn)
     }
 
-    /// Lets a drag go past `limit` with growing resistance.
-    private func rubberBand(_ value: Double, limit: Double) -> Double {
-        let over = abs(value) - limit
-        guard over > 0 else { return value }
-        return (value < 0 ? -1 : 1) * (limit + limit * 0.5 * (1 - 1 / (over / limit + 1)))
+    /// The same direction as `degrees`, as an angle from -180 to 180.
+    private static func shorterWay(_ degrees: Double) -> Double {
+        let turned = degrees.truncatingRemainder(dividingBy: 360)
+        return turned > 180 ? turned - 360 : turned < -180 ? turned + 360 : turned
     }
 }
