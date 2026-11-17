@@ -108,7 +108,7 @@ swift test
 .build/debug/duorex snapshot --pattern --hinge 130 --out duo.png   # one frame, no window
 ```
 
-The device is `DuoScene`, drawn by `StageView`. `Sim` and `ScreenFeed` bring the simulator's screen to it. `Pane` reads the terminal, and `Dock` keeps the window over the pane.
+The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
 
 ## License
 
