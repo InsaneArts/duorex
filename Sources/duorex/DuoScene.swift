@@ -201,8 +201,10 @@ final class DuoScene {
         let hits = surface.worldLeaves().compactMap { $0.intersect(origin: camera.position, direction: direction) }
         guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }) else { return Probe(button: button) }
         let onScreen = CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y))
-        return Probe(glass: nearest.outside == 0 ? onScreen : nil, nearest: onScreen,
-                     onFrame: nearest.outside > 0 && nearest.outside <= Self.frameWidth, button: button)
+        // On the glass the pointer touches the screen, however near a button is.
+        let onGlass = nearest.outside == 0
+        return Probe(glass: onGlass ? onScreen : nil, nearest: onScreen,
+                     onFrame: !onGlass && nearest.outside <= Self.frameWidth, button: onGlass ? nil : button)
     }
 
     /// Backs the camera off so the device fills the view at any tilt, and closes in as it folds.
