@@ -26,6 +26,12 @@ nonisolated struct TerminalInput {
     private var pending: [UInt8] = []
 
     mutating func read(_ bytes: some Sequence<UInt8>) -> [Event] {
+        let bytes = Array(bytes)
+        // An escape that arrived by itself was either the Esc key or the start of a sequence
+        // cut in two. Only "[" or "O" continues a sequence. Anything else means it was the key.
+        if pending == [0x1B], let first = bytes.first, first != UInt8(ascii: "["), first != UInt8(ascii: "O") {
+            pending.removeAll()
+        }
         pending.append(contentsOf: bytes)
         var events: [Event] = []
         var index = 0
@@ -45,7 +51,8 @@ nonisolated struct TerminalInput {
                 continue
             }
             guard pending[index + 1] == UInt8(ascii: "[") else {
-                index += 2   // an Alt chord: not used
+                // An Alt chord, which is not used. A second escape starts its own sequence.
+                index += pending[index + 1] == 0x1B ? 1 : 2
                 continue
             }
             // A control sequence runs to its final byte, 0x40...0x7E.
