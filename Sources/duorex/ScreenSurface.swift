@@ -8,9 +8,18 @@ nonisolated struct ScreenLeaf {
     /// The part of the framebuffer this leaf shows, as x, y, width, height in 0...1.
     var region: SIMD4<Float>
 
-    /// Where a ray meets this leaf's plane, in framebuffer coordinates.
+    /// The way the leaf faces. A screen shows its picture the right way round, so its face is the
+    /// side from which the framebuffer's x runs right and its y runs down.
+    var outward: SIMD3<Float> {
+        let axes = place(uvA)
+        return simd_normalize(simd_cross(axes.down, axes.across))
+    }
+
+    /// Where a ray meets this leaf's plane from the front, in framebuffer coordinates. A ray
+    /// from behind meets the device first, not the glass.
     /// `outside` is how far the point lies beyond the leaf, in framebuffer units; 0 means on the screen.
     func intersect(origin: SIMD3<Float>, direction: SIMD3<Float>) -> (uv: SIMD2<Float>, distance: Float, outside: Float)? {
+        guard simd_dot(direction, outward) < 0 else { return nil }
         let e1 = b - a, e2 = c - a
         let normal = simd_cross(e1, e2)
         let facing = simd_dot(direction, normal)
