@@ -102,7 +102,7 @@ nonisolated struct Presence {
             return "rotate"
         case .other(let kind):
             // The server hides which keys are typed.
-            return ["key": "typing", "multi-touch": "pinch"][kind] ?? kind.replacingOccurrences(of: "-", with: " ")
+            return ["key": "typing", "multi-touch": "pinch", "ca-debug": "debug option"][kind] ?? kind.replacingOccurrences(of: "-", with: " ")
         }
     }
 

@@ -168,6 +168,10 @@ nonisolated enum SimWire {
                 others.append((.button(button.rawValue, phase: pressed ? "down" : "up"), time))
             case .rotate(let orientation):
                 others.append((.rotate(orientation.rawValue), time))
+            case .slowAnimations:
+                others.append((.other("ca-debug"), time))
+            case .memoryWarning:
+                others.append((.other("memory-warning"), time))
             case .fold:
                 break   // the log has no entry for a fold
             }
@@ -211,6 +215,10 @@ nonisolated enum SimWire {
         case rotate(Orientation)
         /// A hardware button going down or coming up.
         case button(HardwareButton, pressed: Bool)
+        /// Makes every animation on the simulator slow, or normal again.
+        case slowAnimations(Bool)
+        /// Tells the apps on the simulator that memory is low.
+        case memoryWarning
 
         /// The bytes of the socket message: a tag and a JSON object.
         var data: Data {
@@ -223,6 +231,10 @@ nonisolated enum SimWire {
                 (0x07, ["orientation": orientation.rawValue])
             case .button(let button, let pressed):
                 (0x04, ["button": button.rawValue, "page": button.usage.page, "usage": button.usage.usage, "phase": pressed ? "down" : "up"])
+            case .slowAnimations(let slow):
+                (0x08, ["option": "debug_slow_animations", "enabled": slow])
+            case .memoryWarning:
+                (0x09, [:])
             }
             return Data([tag]) + ((try? JSONSerialization.data(withJSONObject: fields)) ?? Data())
         }
