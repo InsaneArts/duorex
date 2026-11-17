@@ -12,10 +12,16 @@ final class StageView: NSView {
     var onEffect: ((DeviceMotion.Effect) -> Void)?
     /// The pointer came to rest on a hardware button, or left it.
     var onHover: ((HardwareButton?) -> Void)?
+    /// Another client of the simulator did something, or has been quiet for a moment.
+    var onActivity: ((SimWire.Activity?) -> Void)?
     /// When set, every change to the device also goes into its movie.
     var recorder: Recorder?
 
     private var motion = DeviceMotion()
+    private var presence = Presence()
+    /// The marks and the activity as they were at the last tick.
+    private var marks: [Mark] = []
+    private var activity: SimWire.Activity?
     private var link: CADisplayLink?
     /// The device is drawn into these in turn, and the finished one becomes the layer's contents:
     /// one on screen, one being drawn, one spare.
@@ -102,6 +108,11 @@ final class StageView: NSView {
         setNeedsRender()
     }
 
+    /// Takes something another client did to the simulator. Its touches show on the lit screen.
+    func saw(_ activity: SimWire.Activity) {
+        presence.saw(activity, time: CACurrentMediaTime())
+    }
+
     // MARK: Pointer
 
     func pointerDown(at point: CGPoint, option: Bool) {
@@ -147,8 +158,18 @@ final class StageView: NSView {
         let step = motion.step(to: now)
         step.effects.forEach { onEffect?($0) }
         if step.moving { setNeedsRender() }
+        let marks = presence.step(to: now)
+        if marks != self.marks {
+            self.marks = marks
+            setNeedsRender()
+        }
+        let activity = presence.current(at: now)
+        if activity != self.activity {
+            self.activity = activity
+            onActivity?(activity)
+        }
         guard needsRender || movieNeedsRender else { return }
-        scene.apply(motion.pose)
+        scene.apply(motion.pose, marks: marks, on: activePanel)
         // The movie gets every change, whether or not the pane can show it.
         if movieNeedsRender { movieNeedsRender = !(recorder?.capture(scene: scene, time: now) ?? true) }
         guard needsRender else { return }
