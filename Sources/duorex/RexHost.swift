@@ -43,34 +43,25 @@ final class RexHost {
 
     func stop() { events?.terminate() }
 
+    /// Reads the layout again. Events that arrive while it runs lead to one more read after it.
     private func refresh() {
         guard !refreshing else {
             stale = true
             return
         }
         refreshing = true
-        let view = Process()
-        view.executableURL = rex
-        view.arguments = ["api", "call", "--session", session, "session.view"]
-        let pipe = Pipe()
-        view.standardOutput = pipe
-        view.standardError = FileHandle.nullDevice
-        view.terminationHandler = { [weak self] _ in
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.refreshing = false
-                if let placement = self.placement(from: data) {
-                    log.info("rex pane \(placement.rect.debugDescription, privacy: .public) shown \(placement.shown)")
-                    self.onChange?(placement)
-                }
-                if self.stale {
-                    self.stale = false
-                    self.refresh()
-                }
+        Task {
+            let view = try? await Shell.run(rex.path, ["api", "call", "--session", session, "session.view"])
+            refreshing = false
+            if let view, let placement = placement(from: Data(view.utf8)) {
+                log.info("rex pane \(placement.rect.debugDescription, privacy: .public) shown \(placement.shown)")
+                onChange?(placement)
+            }
+            if stale {
+                stale = false
+                refresh()
             }
         }
-        do { try view.run() } catch { refreshing = false }
     }
 
     private func placement(from data: Data) -> Dock.Placement? {
