@@ -1,0 +1,12 @@
+duorex
+
+Sources/duorex/DuoScene.swift and Sources/duorex/ScreenSurface.swift contain code adapted from
+serve-sim (https://github.com/EvanBacon/serve-sim), which is licensed under the Apache License,
+Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+
+Adapted parts: the lookup of Apple's Duo model inside Xcode, the fold rig, the screen material
+slots, and the skinned screen sampling. duorex changed them to render to a window at display
+rate, to keep the model's own materials, and to find touches by ray instead of by projection.
+
+The iPhone Duo model belongs to Apple. duorex reads it from the installed Xcode and does not
+copy or redistribute it.
