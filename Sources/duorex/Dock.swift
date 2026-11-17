@@ -57,7 +57,10 @@ final class Dock {
             MainActor.assumeIsolated { self?.restack() }
         }
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.follow() }
+            MainActor.assumeIsolated {
+                self?.measure()
+                self?.follow()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -79,8 +82,13 @@ final class Dock {
 
     /// The terminal reported the pointer at `local`, in points from the pane's top left.
     func pointerSeen(at local: CGPoint) {
+        locator.reported(local: local, pointer: Self.pointerLocation(), time: CACurrentMediaTime())
+    }
+
+    /// Measures where the pane is, once the pointer has come to rest in it.
+    private func measure() {
         let pointer = Self.pointerLocation()
-        guard locator.wants(local: local, pointer: pointer, time: CACurrentMediaTime()),
+        guard let local = locator.restingReport(pointer: pointer, time: CACurrentMediaTime()),
               let window = Self.window(under: pointer, excluding: getpid()) else { return }
         // A found pane can move to another window of its app, but never to another app.
         if let expected = locator.isMeasured ? host?.pid : pinnedHost, window.pid != expected { return }
@@ -97,7 +105,6 @@ final class Dock {
         if let chrome = locator.chrome {
             UserDefaults.standard.set([Double(chrome.top), Double(chrome.right)], forKey: Self.chromeKey(window.pid))
         }
-        follow()
     }
 
     // MARK: Following
