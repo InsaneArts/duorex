@@ -53,6 +53,35 @@ final class Session {
         pane.onEvent = { [unowned self] event in handle(event) }
         pane.start()
         paneResized()
+        // The stage works without a simulator too: it folds, makes its sounds and names its parts.
+        stage.onEffect = { [unowned self] effect in
+            switch effect {
+            case .touch(let phase, let point):
+                if phase == .begin { touchEdge = interface.homeEdge(atFramebufferPoint: point) }
+                sim?.send(.touch(phase, x: point.x, y: point.y, edge: touchEdge))
+            case .scroll(let phase, let point):
+                sim?.send(.touch(phase, x: point.x, y: point.y, edge: nil))
+            case .pinch(let phase, let first, let second):
+                sim?.send(.pinch(phase, first, second))
+            case .hinge(let degrees):
+                sync.userMovedHinge(time: CACurrentMediaTime())
+                sim?.fold(to: degrees)
+            case .button(let button, let pressed):
+                sim?.send(.button(button, pressed: pressed))
+            case .sound(let sound, let strength):
+                let played = self.sound.play(sound, strength: strength)
+                log.debug("sound: \(String(describing: sound), privacy: .public) \(strength, format: .fixed(precision: 2)) played \(played)")
+            }
+        }
+        // The buttons are small and the frame is thin. The line says what a press there takes hold of.
+        stage.onHover = { [unowned self] hover in
+            hovered = hover
+            caption()
+        }
+        stage.onActivity = { [unowned self] activity in
+            self.activity = activity
+            caption()
+        }
         rex?.onChange = { [unowned self] placement in dock.placement = placement }
         rex?.start()
 
@@ -105,37 +134,9 @@ final class Session {
                 move(sync.simulatorReported(hinge: hinge, shown: stage.hingeDegrees, time: now))
             }
         }
-        stage.onEffect = { [unowned self] effect in
-            switch effect {
-            case .touch(let phase, let point):
-                if phase == .begin { touchEdge = interface.homeEdge(atFramebufferPoint: point) }
-                sim.send(.touch(phase, x: point.x, y: point.y, edge: touchEdge))
-            case .scroll(let phase, let point):
-                sim.send(.touch(phase, x: point.x, y: point.y, edge: nil))
-            case .pinch(let phase, let first, let second):
-                sim.send(.pinch(phase, first, second))
-            case .hinge(let degrees):
-                sync.userMovedHinge(time: CACurrentMediaTime())
-                sim.fold(to: degrees)
-            case .button(let button, let pressed):
-                sim.send(.button(button, pressed: pressed))
-            case .sound(let sound, let strength):
-                let played = self.sound.play(sound, strength: strength)
-                log.debug("sound: \(String(describing: sound), privacy: .public) \(strength, format: .fixed(precision: 2)) played \(played)")
-            }
-        }
-        // The buttons are small and the frame is thin. The line says what a press there takes hold of.
-        stage.onHover = { [unowned self] hover in
-            hovered = hover
-            caption()
-        }
         sim.onActivity = { [unowned self] activity in
             log.debug("another client: \(String(describing: activity), privacy: .public)")
             stage.saw(activity)
-        }
-        stage.onActivity = { [unowned self] activity in
-            self.activity = activity
-            caption()
         }
         sim.start()
     }
@@ -178,10 +179,15 @@ final class Session {
 
     /// Changes a setting of the simulator, and says the new value or why it did not change.
     private func change(_ setting: @escaping (String) async throws -> String) {
-        guard let device = sim?.device else { return }
+        guard let device = sim?.device else { return tell("no simulator") }
         Task {
             do { tell(try await setting(device)) } catch { tell("\(error)") }
         }
+    }
+
+    /// Shows the keys, as when there is no simulator to wait for.
+    func showKeys() {
+        show(hint)
     }
 
     /// Does what the sync decided about a hinge angle from the simulator.
@@ -246,12 +252,12 @@ final class Session {
             case "+", "=", "-":
                 change { "text size: \(try await SimSettings.stepTextSize(of: $0, larger: key != "-"))" }
             case "s":
-                guard let sim else { break }
+                guard let sim else { tell("no simulator"); break }
                 slow.toggle()
                 sim.send(.slowAnimations(slow))
                 tell("slow animations \(slow ? "on" : "off")")
             case "w":
-                guard let sim else { break }
+                guard let sim else { tell("no simulator"); break }
                 sim.send(.memoryWarning)
                 tell("memory warning")
             case "m":
