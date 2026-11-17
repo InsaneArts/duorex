@@ -8,7 +8,7 @@ enum Release {
     /// Where `install.sh` keeps the source it builds from. It reads the same variables as the installer.
     private static var source: URL {
         let environment = ProcessInfo.processInfo.environment
-        if let custom = environment["DUOREX_SRC"] { return URL(fileURLWithPath: custom) }
+        if let custom = environment["DUOREX_SRC"], !custom.isEmpty { return URL(fileURLWithPath: custom) }
         return URL(fileURLWithPath: environment["HOME"] ?? NSHomeDirectory()).appendingPathComponent(".local/share/duorex/src")
     }
 
@@ -22,6 +22,10 @@ enum Release {
 
             """.utf8))
             exit(1)
+        }
+        // The update replaces the binary that is running, wherever it was installed.
+        if let binary = Bundle.main.executableURL?.resolvingSymlinksInPath() {
+            setenv("DUOREX_BIN", binary.deletingLastPathComponent().path, 0)
         }
         execv("/bin/sh", ["/bin/sh", installer].map { strdup($0) } + [nil])
         FileHandle.standardError.write(Data("duorex: could not run \(installer)\n".utf8))
