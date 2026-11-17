@@ -123,10 +123,10 @@ final class Session {
         sim.start()
     }
 
-    /// Shows a line of text under the device.
+    /// Shows a line of text under the device. A new status is news, so it shows at once, whatever else the line said.
     func show(_ status: String) {
         self.status = status
-        caption()
+        pane.caption(status)
     }
 
     /// Writes the line under the device: the button under the pointer, or what an agent does, or the status.
