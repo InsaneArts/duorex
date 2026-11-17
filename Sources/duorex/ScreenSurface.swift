@@ -28,6 +28,22 @@ nonisolated struct ScreenLeaf {
         let clamped = simd_clamp(uv, low, high)
         return (clamped, distance, simd_distance(uv, clamped))
     }
+
+    /// Whether a framebuffer point is on this leaf's part of the screen.
+    func shows(_ uv: SIMD2<Float>) -> Bool {
+        uv.x >= region.x && uv.y >= region.y && uv.x <= region.x + region.z && uv.y <= region.y + region.w
+    }
+
+    /// Where a framebuffer point lies on this leaf's plane. `across` and `down` are the ways the
+    /// framebuffer's x and y run there, each as long as the whole framebuffer.
+    func place(_ uv: SIMD2<Float>) -> (point: SIMD3<Float>, across: SIMD3<Float>, down: SIMD3<Float>) {
+        let u = uvB - uvA, v = uvC - uvA
+        let det = u.x * v.y - u.y * v.x
+        let e1 = b - a, e2 = c - a
+        let across = (e1 * v.y - e2 * u.y) / det, down = (e2 * u.x - e1 * v.x) / det
+        let offset = uv - uvA
+        return (a + across * offset.x + down * offset.y, across, down)
+    }
 }
 
 /// Follows a screen's mesh through the fold animation.
