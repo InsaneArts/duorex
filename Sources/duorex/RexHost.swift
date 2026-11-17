@@ -23,6 +23,22 @@ final class RexHost {
         self.block = block
     }
 
+    /// Opens a pane beside the one this command runs in, and runs `command` there. The focus
+    /// stays where it is. Returns false when this is not a Rex pane.
+    static func openPane(running command: [String]) async throws -> Bool {
+        let environment = ProcessInfo.processInfo.environment
+        guard let directory = environment["REX_BIN_DIR"], let session = environment["REX_SESSION"], let block = environment["REX_BLOCK"] else { return false }
+        let rex = URL(fileURLWithPath: directory).appendingPathComponent("rex").path
+        _ = try await Shell.run(rex, ["split", "--session", session, "--block", block, "--split=right", "--ratio", "42", "--focus=false",
+                                      "--label", "duorex", "--"] + command)
+        return true
+    }
+
+    /// The Rex session this command runs in, or nil outside Rex.
+    static var session: String? {
+        ProcessInfo.processInfo.environment["REX_SESSION"]
+    }
+
     func start() {
         refresh()
         // Terminals in the session report titles and status all the time. Only layout events move the pane.
