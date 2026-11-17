@@ -369,3 +369,24 @@ private func sounds(_ effects: [DeviceMotion.Effect]) -> [DeviceMotion.Sound] {
     #expect(soft >= 0 && soft < hard)
     #expect(hard <= 1)
 }
+
+// MARK: Found by review
+
+@Test func `a press on the background holds a device that was on its way back`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+    _ = motion.pointerMoved(to: CGPoint(x: 410, y: 50), probe: probe)
+    _ = motion.pointerUp(at: CGPoint(x: 410, y: 50), probe: probe)
+    var time = 100.0
+    while abs(motion.pose.yaw) > 110 {
+        time += 1.0 / 60
+        _ = motion.step(to: time)
+    }
+    _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+    let held = motion.pose.yaw
+    // The user holds still, then moves one point. The device stays in the hand.
+    _ = run(&motion, from: time, seconds: 0.4)
+    #expect(abs(motion.pose.yaw - held) < 0.001)
+    _ = motion.pointerMoved(to: CGPoint(x: 51, y: 50), probe: probe)
+    #expect(abs(motion.pose.yaw - held) < 1)
+}
