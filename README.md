@@ -64,7 +64,11 @@ npx serve-sim tap 0.5 0.4    # a point on the screen, from 0 to 1
 npx serve-sim fold 130
 ```
 
-When the agent folds the device, the one in your pane folds too. The agent can also run `duorex sweep` and read the sheet, to check its own work in every posture.
+When the agent folds the device, the one in your pane folds too. When it touches the screen, you see where: a tap leaves a spot with a ring, and a swipe leaves a trail. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark.
+
+The marks are part of the device, so `duorex record` puts them in the movie too.
+
+The agent can also run `duorex sweep` and read the sheet, to check its own work in every posture.
 
 ## Install
 
@@ -131,6 +135,8 @@ Options:
 ## Limits
 
 - The camera control press goes to the simulator, but iOS showed no reaction to it in our tests.
+- duorex shows the touches that reach the simulator through serve-sim. A tool that touches it another way leaves no mark.
+- serve-sim reports a swipe when the finger first moves and when it comes up, so the trail is drawn after the swipe.
 - Typing does not reach the simulator. With Xcode 27, serve-sim can type only through Device Hub.
 - Folding and touches on the inner screen use private Xcode interfaces through serve-sim, so an Xcode update can break them. duorex pins the serve-sim release it was written against.
 - Outside Rex, the device does not hide when you switch tabs, because other terminals do not report their layout.
@@ -141,9 +147,10 @@ Options:
 swift build
 swift test
 .build/debug/duorex snapshot --pattern --hinge 130 --out duo.png   # one frame, no window
+.build/debug/duorex snapshot --pattern --touch 0.3,0.4 --out tap.png   # the same, with a touch mark
 ```
 
-The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
+The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
 
 ## License
 
