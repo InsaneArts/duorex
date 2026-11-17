@@ -20,7 +20,7 @@ Click, drag and scroll on either screen. The touch lands where you point, on a f
 
 Hold Option and drag on a screen to pinch. The pointer is one finger, and the other mirrors it about the middle of the screen. Both show as pale spots, also before you press.
 
-Drag the background to tilt the device. It springs back when you let go.
+Drag the background to turn the device. A long drag turns it all the way round, so you see its back. It comes back to the front when you let go.
 
 ## Press its buttons
 
@@ -127,7 +127,7 @@ Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and
 - Drag the frame to fold. Option-drag off the screen folds from anywhere.
 - Option-drag on a screen pinches.
 - Click a button on the frame to press it.
-- Drag the background to tilt.
+- Drag the background to turn the device. It comes back when you let go.
 - `1` `2` `3` choose closed, book and open. `[` and `]` fold 10 degrees less or more.
 - `r` rotates, `h` goes home, `q` quits.
 - `d` switches dark mode. `+` and `-` change the text size. `s` slows the animations. `w` sends a memory warning.
