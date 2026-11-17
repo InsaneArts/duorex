@@ -74,7 +74,8 @@ nonisolated struct DeviceMotion {
 
     /// Takes the hinge angle the simulator reports, as when an agent folds the device.
     mutating func follow(hinge degrees: Double, animated: Bool) {
-        if case .fold = grab { return }
+        // Not while the pointer holds the device: it would move under the finger.
+        guard case .none = grab else { return }
         userOwnsHinge = false
         if animated { hinge.target = degrees } else { hinge.hold(degrees) }
         reportedHinge = degrees

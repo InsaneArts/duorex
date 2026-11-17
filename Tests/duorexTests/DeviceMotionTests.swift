@@ -121,3 +121,11 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     _ = run(&motion, from: 101, seconds: 4)
     #expect(motion.pose.yaw == 0)
 }
+
+@Test func `the device does not move under a finger that is down`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 400, y: 300), option: false, probe: probe)
+    // The simulator reports a new hinge angle while the touch is held.
+    motion.follow(hinge: 60, animated: false)
+    #expect(motion.pose.hinge == 180)
+}
