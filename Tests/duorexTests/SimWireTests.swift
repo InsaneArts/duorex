@@ -160,9 +160,6 @@ private func dragEvent(phase: String) -> String {
     var sent = SimWire.Sent()
     sent.note(.touch(.begin, x: 0.3, y: 0.6, edge: nil), time: 0)
     #expect(sent.claims(.tap(CGPoint(x: 0.5, y: 0.5)), time: 0.2) == false)
-    // Where duorex's own touch went on to does not make a touch from there its own.
-    sent.note(.touch(.move, x: 0.5, y: 0.5, edge: nil), time: 0.1)
-    #expect(sent.claims(.tap(CGPoint(x: 0.5, y: 0.5)), time: 0.2) == false)
 }
 
 @Test func `a button or a turn that duorex sent is its own once`() {
@@ -184,4 +181,39 @@ private func dragEvent(phase: String) -> String {
     // A finger that comes up when the log follows no touch is logged raw.
     let touch = #"{"source":"hid","kind":"touch","action":"end","summary":"Touch end 0.5,0.5","details":{"type":"end","x":0.5,"y":0.5},"id":8}"#
     #expect(events.read(eventLine(renderer) + eventLine(touch)).isEmpty)
+}
+
+@Test func `another client's touch during a drag does not make the rest of the drag its own`() {
+    var sent = SimWire.Sent()
+    sent.note(.touch(.begin, x: 0.2, y: 0.5, edge: nil), time: 0)
+    sent.note(.touch(.move, x: 0.3, y: 0.5, edge: nil), time: 0.1)
+    // An agent taps now. The server follows one touch for a device, so the log starts a new
+    // drag where duorex's finger moves next.
+    sent.note(.touch(.move, x: 0.4, y: 0.5, edge: nil), time: 0.2)
+    sent.note(.touch(.move, x: 0.5, y: 0.5, edge: nil), time: 0.3)
+    #expect(sent.claims(.drag(from: CGPoint(x: 0.4, y: 0.5), to: CGPoint(x: 0.5, y: 0.5), ended: false), time: 0.3) == true)
+    for step in 0..<200 { sent.note(.touch(.move, x: 0.5, y: 0.5 + Double(step) / 1000, edge: nil), time: 0.4) }
+    sent.note(.touch(.end, x: 0.5, y: 0.7, edge: nil), time: 5)
+    #expect(sent.claims(.drag(from: CGPoint(x: 0.4, y: 0.5), to: CGPoint(x: 0.5, y: 0.7), ended: true), time: 5.1) == true)
+}
+
+@Test func `a touch stays duorex's own only for a moment after it ended`() {
+    var sent = SimWire.Sent()
+    sent.note(.touch(.begin, x: 0.5, y: 0.985, edge: 3), time: 0)
+    sent.note(.touch(.end, x: 0.5, y: 0.4, edge: 3), time: 0.2)
+    #expect(sent.claims(.drag(from: CGPoint(x: 0.5, y: 0.985), to: CGPoint(x: 0.5, y: 0.4), ended: true), time: 0.3) == true)
+    // Much later, an agent swipes home from the same point.
+    #expect(sent.claims(.drag(from: CGPoint(x: 0.5, y: 0.985), to: CGPoint(x: 0.5, y: 0.4), ended: true), time: 10) == false)
+}
+
+@Test func `a drag that another client's touch began and duorex's finger moved is no one's swipe`() {
+    var sent = SimWire.Sent()
+    sent.note(.touch(.begin, x: 0.2, y: 0.5, edge: nil), time: 0)
+    // An agent's finger goes down at another point. Before it comes up, duorex's finger moves,
+    // and the server takes that move for the agent's.
+    sent.note(.touch(.move, x: 0.3, y: 0.5, edge: nil), time: 0.1)
+    #expect(sent.claims(.drag(from: CGPoint(x: 0.9, y: 0.9), to: CGPoint(x: 0.3, y: 0.5), ended: false), time: 0.1) == true)
+    // The agent's own touch is still the agent's.
+    #expect(sent.claims(.tap(CGPoint(x: 0.9, y: 0.9)), time: 0.2) == false)
+    #expect(sent.claims(.drag(from: CGPoint(x: 0.9, y: 0.9), to: CGPoint(x: 0.6, y: 0.9), ended: true), time: 0.3) == false)
 }
