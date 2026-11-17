@@ -79,7 +79,8 @@ final class Recorder {
     }
 
     /// Ends the movie at `time`, so it lasts as long as the recording did, and writes the file.
-    func finish(scene: DuoScene, time: Double) async {
+    /// Throws when the file could not be written, as when the disk is full.
+    func finish(scene: DuoScene, time: Double) async throws {
         guard !finished else { return }
         while drawing { try? await Task.sleep(for: .milliseconds(5)) }
         // One last picture at the end time. Without it the movie would stop at the last change.
@@ -89,6 +90,9 @@ final class Recorder {
         finished = true
         input.markAsFinished()
         await writer.finishWriting()
+        guard writer.status == .completed else {
+            throw DuoError.render("could not write the movie: \(writer.error?.localizedDescription ?? "unknown error")")
+        }
     }
 
     private func append(at seconds: Double) {
