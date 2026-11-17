@@ -73,8 +73,15 @@ nonisolated struct DeviceMotion {
     /// True while the device turns back to the front from far away.
     private var comingBack = false
 
-    /// The hardware button under a pointer that is not pressed.
-    private(set) var hoveredButton: HardwareButton?
+    /// What a press would take hold of where the pointer rests, when that is not plain to see.
+    enum Hover: Equatable {
+        case button(HardwareButton)
+        /// The frame. A drag from there folds the device.
+        case frame
+    }
+
+    /// What is under a pointer that is not pressed.
+    private(set) var hovered: Hover?
     /// The two fingers of a pinch, as framebuffer points: while the user pinches, and before
     /// that while the pointer rests on the glass with Option held.
     private(set) var fingers: [CGPoint] = []
@@ -150,7 +157,7 @@ nonisolated struct DeviceMotion {
             // A little parallax toward the pointer keeps the device feeling like an object.
             lastHover = time
             let under = probe(point)
-            hoveredButton = under.button
+            hovered = under.button.map(Hover.button) ?? (under.onFrame ? .frame : nil)
             fingers = option ? under.glass.map(Self.pinch) ?? [] : []
             yaw.target = (Double(point.x / viewSize.width) - 0.5) * 9
             pitch.target = (Double(point.y / viewSize.height) - 0.5) * 6
@@ -214,7 +221,7 @@ nonisolated struct DeviceMotion {
     /// The pointer left the view, so the device stops turning toward it.
     mutating func pointerLeft() {
         lastHover = -.infinity
-        hoveredButton = nil
+        hovered = nil
         if case .none = grab { fingers = [] }
     }
 
