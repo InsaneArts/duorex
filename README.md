@@ -137,6 +137,7 @@ Options:
 - The camera control press goes to the simulator, but iOS showed no reaction to it in our tests.
 - duorex shows the touches that reach the simulator through serve-sim. A tool that touches it another way leaves no mark.
 - serve-sim reports a swipe when the finger first moves and when it comes up, so the trail is drawn after the swipe.
+- serve-sim follows one touch at a time. When you and an agent touch at the same moment, the agent's mark can be cut short.
 - Typing does not reach the simulator. With Xcode 27, serve-sim can type only through Device Hub.
 - Folding and touches on the inner screen use private Xcode interfaces through serve-sim, so an Xcode update can break them. duorex pins the serve-sim release it was written against.
 - Outside Rex, the device does not hide when you switch tabs, because other terminals do not report their layout.
