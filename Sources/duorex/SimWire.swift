@@ -168,6 +168,8 @@ nonisolated enum SimWire {
                 others.append((.button(button.rawValue, phase: pressed ? "down" : "up"), time))
             case .rotate(let orientation):
                 others.append((.rotate(orientation.rawValue), time))
+            case .pinch:
+                others.append((.other("multi-touch"), time))   // the log has an entry for each part of a pinch
             case .slowAnimations:
                 others.append((.other("ca-debug"), time))
             case .memoryWarning:
@@ -213,6 +215,8 @@ nonisolated enum SimWire {
         case touch(DeviceMotion.TouchPhase, x: Double, y: Double, edge: Int?)
         case fold(degrees: Double)
         case rotate(Orientation)
+        /// Two fingers on the lit panel, at framebuffer points from 0 to 1.
+        case pinch(DeviceMotion.TouchPhase, CGPoint, CGPoint)
         /// A hardware button going down or coming up.
         case button(HardwareButton, pressed: Bool)
         /// Makes every animation on the simulator slow, or normal again.
@@ -225,6 +229,8 @@ nonisolated enum SimWire {
             let (tag, fields): (UInt8, [String: Any]) = switch self {
             case .touch(let phase, let x, let y, let edge):
                 (0x03, ["type": Self.name(of: phase), "x": x, "y": y].merging(edge.map { ["edge": $0] } ?? [:]) { $1 })
+            case .pinch(let phase, let first, let second):
+                (0x05, ["type": Self.name(of: phase), "x1": first.x, "y1": first.y, "x2": second.x, "y2": second.y])
             case .fold(let degrees):
                 (0x0E, ["hinge": (degrees * 10).rounded() / 10])
             case .rotate(let orientation):
