@@ -217,3 +217,23 @@ private func dragEvent(phase: String) -> String {
     #expect(sent.claims(.tap(CGPoint(x: 0.9, y: 0.9)), time: 0.2) == false)
     #expect(sent.claims(.drag(from: CGPoint(x: 0.9, y: 0.9), to: CGPoint(x: 0.6, y: 0.9), ended: true), time: 0.3) == false)
 }
+
+@Test func `slow animations and a memory warning are debug messages`() throws {
+    let slow = try fields(.slowAnimations(true))
+    #expect(slow.tag == 0x08)
+    #expect(slow.json["option"] as? String == "debug_slow_animations")
+    #expect(slow.json["enabled"] as? Bool == true)
+    #expect(try fields(.slowAnimations(false)).json["enabled"] as? Bool == false)
+    let warning = try fields(.memoryWarning)
+    #expect(warning.tag == 0x09)
+    #expect(warning.json.isEmpty)
+}
+
+@Test func `a debug option that duorex set is its own`() {
+    var sent = SimWire.Sent()
+    sent.note(.slowAnimations(true), time: 0)
+    sent.note(.memoryWarning, time: 0)
+    #expect(sent.claims(.other("ca-debug"), time: 0.1) == true)
+    #expect(sent.claims(.other("memory-warning"), time: 0.1) == true)
+    #expect(sent.claims(.other("memory-warning"), time: 0.2) == false)
+}
