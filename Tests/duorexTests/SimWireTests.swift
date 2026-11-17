@@ -237,3 +237,23 @@ private func dragEvent(phase: String) -> String {
     #expect(sent.claims(.other("memory-warning"), time: 0.1) == true)
     #expect(sent.claims(.other("memory-warning"), time: 0.2) == false)
 }
+
+@Test func `a pinch is two fingers in one message`() throws {
+    let pinch = try fields(.pinch(.move, CGPoint(x: 0.25, y: 0.3), CGPoint(x: 0.75, y: 0.7)))
+    #expect(pinch.tag == 0x05)
+    #expect(pinch.json["type"] as? String == "move")
+    #expect(pinch.json["x1"] as? Double == 0.25)
+    #expect(pinch.json["y1"] as? Double == 0.3)
+    #expect(pinch.json["x2"] as? Double == 0.75)
+    #expect(pinch.json["y2"] as? Double == 0.7)
+}
+
+@Test func `a pinch that duorex sent is its own, part by part`() {
+    var sent = SimWire.Sent()
+    sent.note(.pinch(.begin, .zero, .zero), time: 0)
+    sent.note(.pinch(.end, .zero, .zero), time: 0.1)
+    // The log has one entry for each part of a pinch.
+    #expect(sent.claims(.other("multi-touch"), time: 0.1) == true)
+    #expect(sent.claims(.other("multi-touch"), time: 0.2) == true)
+    #expect(sent.claims(.other("multi-touch"), time: 0.3) == false)
+}
