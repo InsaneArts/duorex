@@ -218,8 +218,16 @@ final class DuoScene {
         let button = overButtons.filter { $0.distance <= reach }.min { $0.distance < $1.distance }?.button
         guard let surface = surfaces[panel] else { return Probe(button: button) }
         let direction = simd_normalize(SIMD3<Float>((Float(point.x) * 2 - 1) * aspect * tangent, (1 - Float(point.y) * 2) * tangent, -1))
-        let hits = surface.worldLeaves().compactMap { $0.intersect(origin: eye, direction: direction) }
-        guard let nearest = hits.min(by: { ($0.outside, $0.distance) < ($1.outside, $1.distance) }) else { return Probe(button: button) }
+        func hit(on surface: ScreenSurface?) -> (uv: SIMD2<Float>, distance: Float, outside: Float)? {
+            surface?.worldLeaves().compactMap { $0.intersect(origin: eye, direction: direction) }
+                .min { ($0.outside, $0.distance) < ($1.outside, $1.distance) }
+        }
+        guard let nearest = hit(on: surface) else {
+            // The lit screen faces away, as the cover does on a half-shut device. The user sees
+            // the other screen, dark. It and its frame are the body, to take hold of and fold.
+            let body = hit(on: surfaces[panel.other])
+            return Probe(onFrame: body.map { $0.outside <= Self.frameWidth } ?? false, button: button)
+        }
         let onScreen = CGPoint(x: CGFloat(nearest.uv.x), y: CGFloat(nearest.uv.y))
         // On the glass the pointer touches the screen, however near a button is.
         let onGlass = nearest.outside == 0
