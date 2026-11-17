@@ -59,9 +59,15 @@ case "snapshot":
             if let button = arguments.string("press").flatMap({ name in HardwareButton.allCases.first { $0.rawValue.lowercased() == name.lowercased() } }) {
                 pose.press = .init(button: button, depth: 1)
             }
+            // "--touch x,y" draws a tap there, and "--touch x,y,x,y" a swipe, each as it looks at "--age" seconds.
+            var presence = Presence()
+            let touch = (arguments.string("touch") ?? "").split(separator: ",").compactMap { Double($0) }
+            if touch.count == 2 { presence.saw(.tap(CGPoint(x: touch[0], y: touch[1])), time: 0) }
+            if touch.count == 4 { presence.saw(.drag(from: CGPoint(x: touch[0], y: touch[1]), to: CGPoint(x: touch[2], y: touch[3]), ended: true), time: 0) }
             let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex.png")
             let gray = arguments.string("backdrop").flatMap(Double.init)
-            try await Snapshot.write(scene: try await scene(), pose: pose, width: Int(arguments.double("width", default: 1400)),
+            try await Snapshot.write(scene: try await scene(), pose: pose, marks: presence.step(to: arguments.double("age", default: 0.1)),
+                                     width: Int(arguments.double("width", default: 1400)),
                                      height: Int(arguments.double("height", default: 1000)),
                                      backdrop: gray.map { CGColor(gray: $0, alpha: 1) }, onStage: arguments.flag("stage"), to: out)
             print(out.path)

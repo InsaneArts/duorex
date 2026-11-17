@@ -32,6 +32,7 @@ final class DuoScene {
     /// from this table, and not from the model's clip, leaves them free for the buttons too.
     private let foldPoses: [[Transform]]
     private let buttons: HardwareButtons
+    private let markLayer: MarkLayer
     private let camera = PerspectiveCamera()
     private let slots: [Panel: (entity: ModelEntity, material: Int)]
     private let surfaces: [Panel: ScreenSurface]
@@ -109,6 +110,8 @@ final class DuoScene {
         let body = slots[.inner]!.entity
         self.body = body
         buttons = try HardwareButtons(entity: body)
+        markLayer = try MarkLayer()
+        renderer.entities.append(markLayer.root)
         let playback = subject.playAnimation(clip, transitionDuration: 0, startsPaused: true)
         var poses: [[Transform]] = []
         for step in 0...Self.foldSteps {
@@ -145,7 +148,8 @@ final class DuoScene {
         slot.entity.model?.materials[slot.material] = material
     }
 
-    func apply(_ pose: Pose) {
+    /// Puts the device in a pose. `marks` are the touches to show on `panel`, the lit screen.
+    func apply(_ pose: Pose, marks: [Mark] = [], on panel: Panel = .inner) {
         self.pose = pose
         let hinge = min(max(pose.hinge, 0), 180)
         let raise = Float((180 - hinge) * .pi / 180)
@@ -174,11 +178,13 @@ final class DuoScene {
         orbit.orientation = simd_quatf(angle: Float(pose.yaw * .pi / 180), axis: [0, 1, 0])
             * simd_quatf(angle: Float(pose.pitch * .pi / 180), axis: [1, 0, 0])
             * simd_quatf(angle: Float(pose.roll * .pi / 180), axis: [0, 0, 1])
+        // The marks lie on the screen, so they are placed last, on the screen as it is now.
+        markLayer.show(marks, on: marks.isEmpty ? [] : surfaces[panel]?.worldLeaves() ?? [])
     }
 
     /// Draws `pose` into `frame`, and returns when the picture is ready.
-    func draw(_ pose: Pose, into frame: Frame) async throws {
-        apply(pose)
+    func draw(_ pose: Pose, marks: [Mark] = [], on panel: Panel = .inner, into frame: Frame) async throws {
+        apply(pose, marks: marks, on: panel)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             do {
                 try render(into: frame) { continuation.resume() }

@@ -7,9 +7,10 @@ import UniformTypeIdentifiers
 
 /// Renders one frame to a PNG without opening a window. Used to check the renderer.
 enum Snapshot {
-    static func write(scene: DuoScene, pose: Pose, width: Int, height: Int, backdrop: CGColor? = nil, onStage: Bool = false, to url: URL) async throws {
+    static func write(scene: DuoScene, pose: Pose, marks: [Mark] = [], width: Int, height: Int, backdrop: CGColor? = nil, onStage: Bool = false, to url: URL) async throws {
         guard let frame = Frame(device: scene.device, width: width, height: height) else { throw DuoError.render("could not create the snapshot frame") }
-        try await scene.draw(pose, into: frame)
+        // A device that is nearly closed shows its cover screen.
+        try await scene.draw(pose, marks: marks, on: pose.hinge < 45 ? .cover : .inner, into: frame)
         let staged = onStage ? CIContext(mtlDevice: scene.device).createCGImage(
             Stage.compose(CIImage(ioSurface: frame.surface), over: Stage.image(width: width, height: height)),
             from: CGRect(x: 0, y: 0, width: width, height: height)) : nil
