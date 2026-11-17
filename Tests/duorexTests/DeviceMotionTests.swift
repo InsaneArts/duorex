@@ -425,3 +425,14 @@ private func sounds(_ effects: [DeviceMotion.Effect]) -> [DeviceMotion.Sound] {
     _ = motion.pointerMoved(to: CGPoint(x: 51, y: 50), probe: probe)
     #expect(abs(motion.pose.yaw - held) < 1)
 }
+
+@Test func `a frame that comes late does not make a slow fold loud`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 185, y: 300), option: false, probe: probe)
+    // The hand shuts the device over two seconds, and the display draws only once, at the end.
+    _ = motion.pointerMoved(to: CGPoint(x: 585, y: 300), probe: probe)
+    let effects = motion.step(to: 102).effects
+    let strength = effects.compactMap { if case .sound(.shut, let strength) = $0 { strength } else { nil } }.first
+    #expect(strength != nil)
+    #expect((strength ?? 1) < 0.4)
+}

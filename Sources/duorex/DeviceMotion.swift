@@ -271,7 +271,8 @@ nonisolated struct DeviceMotion {
     /// Advances the motion to `time`, in seconds. `moving` is true while the pose is still changing.
     mutating func step(to time: Double) -> (effects: [Effect], moving: Bool) {
         // Real elapsed time, so a late frame does not slow the motion down.
-        let elapsed = min(max(time - self.time, 1.0 / 240), 0.1)
+        let passed = max(time - self.time, 1.0 / 240)
+        let elapsed = min(passed, 0.1)
         self.time = time
         var effects: [Effect] = []
         if let finger = wheel, time >= finger.lifts { effects += liftWheelFinger() }
@@ -288,7 +289,8 @@ nonisolated struct DeviceMotion {
         let moving = [turning, hinge.step(elapsed), roll.step(elapsed), press.step(elapsed)].contains(true)
         // The halves stop when the hinge comes to an end. Near an end, they stay there for the ear:
         // the hinge must leave by some degrees before it can arrive again.
-        hingeSpeed = max(abs(hinge.value - lastHinge) / elapsed, hingeSpeed * exp(-elapsed / 0.3))
+        // The speed is over the time that passed, not the capped step: a late frame is not a fast fold.
+        hingeSpeed = max(abs(hinge.value - lastHinge) / passed, hingeSpeed * exp(-passed / 0.3))
         lastHinge = hinge.value
         if let end = Self.end(at: hinge.value) {
             if end != hingeEnd { effects.append(.sound(end, strength: min(max(hingeSpeed / 400, 0.15), 1))) }
