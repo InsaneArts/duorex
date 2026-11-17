@@ -6,12 +6,14 @@ enum DuoError: Error, CustomStringConvertible {
     case model(String)
     case render(String)
     case sim(String)
+    case terminal(String)
 
     var description: String {
         switch self {
         case .model(let reason): "Duo model: \(reason)"
         case .render(let reason): "Render: \(reason)"
         case .sim(let reason): "Simulator: \(reason)"
+        case .terminal(let reason): reason
         }
     }
 }
