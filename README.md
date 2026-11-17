@@ -16,6 +16,12 @@ Click, drag and scroll on either screen. The touch lands where you point, on a f
 
 Drag the background to tilt the device. It springs back when you let go.
 
+## Press its buttons
+
+The power, volume and camera control buttons on the frame are real. Click one and it goes into the frame, and the simulator gets the press: the volume changes, the screen locks. Hold it and the simulator sees it held.
+
+The buttons are small, so rest the pointer on one and the pane names it.
+
 ## See every posture at once
 
 `duorex sweep` folds the simulator through closed, book and open, held upright and turned, and saves one picture of them all. Each cell shows the screen the right way up, the device in that posture, and the size your app got.
@@ -96,6 +102,7 @@ Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and
 
 - Click or drag on a screen to touch it. Scroll to scroll.
 - Drag the frame to fold. Option-drag folds from anywhere.
+- Click a button on the frame to press it.
 - Drag the background to tilt.
 - `1` `2` `3` choose closed, book and open. `[` and `]` fold 10 degrees less or more.
 - `r` rotates, `h` goes home, `q` quits.
