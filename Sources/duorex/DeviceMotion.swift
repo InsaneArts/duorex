@@ -88,6 +88,8 @@ nonisolated struct DeviceMotion {
     private var hingeSpeed = 0.0
     /// True while the device turns back to the front from far away.
     private var comingBack = false
+    /// True once the terminal has told a move with a button down apart from one without.
+    private var terminalTellsDrags = false
 
     /// What a press would take hold of where the pointer rests, when that is not plain to see.
     enum Hover: Equatable {
@@ -178,7 +180,15 @@ nonisolated struct DeviceMotion {
         return effects
     }
 
-    mutating func pointerMoved(to point: CGPoint, option: Bool = false, probe: (CGPoint) -> Probe) -> [Effect] {
+    /// `pressed` is whether the terminal says that a button is down.
+    mutating func pointerMoved(to point: CGPoint, option: Bool = false, pressed: Bool = true, probe: (CGPoint) -> Probe) -> [Effect] {
+        // Some terminals tell every move the same way. One that tells a drag as a drag also
+        // tells, with a plain move, that the button is up: the release was lost.
+        if pressed {
+            terminalTellsDrags = true
+        } else if terminalTellsDrags, isDragging {
+            return pointerUp(at: point, probe: probe) + pointerMoved(to: point, option: option, pressed: false, probe: probe)
+        }
         switch grab {
         case .none:
             // A little parallax toward the pointer keeps the device feeling like an object.
