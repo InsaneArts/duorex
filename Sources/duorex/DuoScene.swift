@@ -45,8 +45,8 @@ final class DuoScene {
     private static let foldClip = (name: "l_over_r", seconds: 5.0)
     /// The fold is baked in steps of two degrees. Angles in between are blended.
     private static let foldSteps = 90
-    /// How near the pointer must be to a button to be on it, as a share of the view's height.
-    private static let buttonReach: Float = 0.045
+    /// How near the pointer must be to a button to be on it, as a share of the device's height.
+    private static let buttonReach: Float = 0.08
     /// How far past the glass still counts as the frame, in framebuffer units.
     private static let frameWidth: Float = 0.09
     private static let screenMaterials: [Panel: String] = [.cover: "YqugYDOqMSOpqyA", .inner: "CvyXbAGXoolRUYl"]
@@ -195,7 +195,9 @@ final class DuoScene {
             let x = 0.5 + center.x / (depth * tangent * aspect) / 2, y = 0.5 - center.y / (depth * tangent) / 2
             return (button, hypot((x - Float(point.x)) * aspect, y - Float(point.y)))
         }
-        let button = overButtons.filter { $0.distance <= Self.buttonReach }.min { $0.distance < $1.distance }?.button
+        // The reach is measured on the device as drawn, so it stays the same part of the frame in any pane.
+        let reach = Self.buttonReach * flatBounds.extents.y / (camera.position.z * tangent * 2)
+        let button = overButtons.filter { $0.distance <= reach }.min { $0.distance < $1.distance }?.button
         guard let surface = surfaces[panel] else { return Probe(button: button) }
         let direction = simd_normalize(SIMD3<Float>((Float(point.x) * 2 - 1) * aspect * tangent, (1 - Float(point.y) * 2) * tangent, -1))
         let hits = surface.worldLeaves().compactMap { $0.intersect(origin: camera.position, direction: direction) }
