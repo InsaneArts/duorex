@@ -30,7 +30,7 @@ final class Session {
         [stage.recorder == nil ? "drag frame to fold  ·  1 2 3 poses  ·  ? keys  ·  q quit" : "● recording  ·  ? keys  ·  q stops and saves",
          "r rotate  ·  h home  ·  d dark  ·  + - text  ·  ? more",
          "s slow  ·  w memory warning  ·  m sound  ·  ? more",
-         "x wireframe  ·  ? back"][hintLine]
+         "x wireframe  ·  g glow  ·  ? back"][hintLine]
     }
     private var hintLine = 0
     /// A word about the key that was just pressed. It gives way to the usual line after a moment.
@@ -265,6 +265,9 @@ final class Session {
             case "m":
                 sound.isMuted.toggle()
                 tell(sound.isMuted ? "sound off" : "sound on")
+            case "g":
+                stage.glows.toggle()
+                tell(stage.glows ? "glow on" : "glow off")
             case "x":
                 stage.scene.isWireframe.toggle()
                 stage.setNeedsRender()
