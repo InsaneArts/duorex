@@ -77,6 +77,100 @@ nonisolated enum SimWire {
         return try? JSONDecoder().decode(Report.self, from: message.dropFirst())
     }
 
+    /// Something a client of the server did to the simulator, as the server's event log tells it.
+    /// Points are on the lit panel's framebuffer, from 0 to 1 with the origin at the top left.
+    enum Activity: Equatable {
+        /// A finger went down and came up in one place.
+        case tap(CGPoint)
+        /// A finger moves across the panel. While it is still down, `ended` is false and `to` is
+        /// where it was when the server first saw it move.
+        case drag(from: CGPoint, to: CGPoint, ended: Bool)
+        /// A hardware button, by the name its client gave it. The phase is "down", "up" or "press".
+        case button(String, phase: String)
+        /// The device was turned to an orientation, by serve-sim's name for it.
+        case rotate(String)
+        /// Anything else, by the server's name for that kind of action, such as "key".
+        case other(String)
+    }
+
+    /// Splits the server's event stream into activities. The stream is server-sent events: one
+    /// "data: " line of JSON for each event, after one such line that holds the events of the past.
+    struct Events {
+        private var pending = Data()
+
+        mutating func read(_ bytes: Data) -> [Activity] {
+            pending.append(bytes)
+            var activities: [Activity] = []
+            while let end = pending.firstIndex(of: UInt8(ascii: "\n")) {
+                let line = pending[pending.startIndex..<end]
+                pending.removeSubrange(pending.startIndex...end)
+                guard line.starts(with: Data("data: ".utf8)),
+                      let message = try? JSONSerialization.jsonObject(with: line.dropFirst(6)) as? [String: Any],
+                      let event = message["event"] as? [String: Any],
+                      let activity = Self.activity(from: event) else { continue }
+                activities.append(activity)
+            }
+            return activities
+        }
+
+        private static func activity(from event: [String: Any]) -> Activity? {
+            guard let kind = event["kind"] as? String else { return nil }
+            let details = event["details"] as? [String: Any] ?? [:]
+            func point(_ name: String) -> CGPoint? {
+                guard let value = details[name] as? [String: Any], let x = value["x"] as? Double, let y = value["y"] as? Double else { return nil }
+                return CGPoint(x: x, y: y)
+            }
+            switch kind {
+            case "tap":
+                return point("start").map { .tap($0) }
+            case "drag":
+                guard let from = point("start"), let to = point("current") else { return nil }
+                return .drag(from: from, to: to, ended: details["phase"] as? String == "end")
+            case "button":
+                return .button(event["action"] as? String ?? "", phase: details["phase"] as? String ?? "press")
+            case "rotate":
+                return .rotate(event["action"] as? String ?? "")
+            default:
+                return .other(kind)
+            }
+        }
+    }
+
+    /// Remembers what this duorex sent. The event log tells every client's actions alike, so
+    /// duorex's own come back in it with the others'.
+    struct Sent {
+        /// Where the last touches began. A touch in the log is known by the point it began at.
+        private var begins: [CGPoint] = []
+        private var others: [(activity: Activity, time: Double)] = []
+
+        mutating func note(_ message: Message, time: Double) {
+            switch message {
+            case .touch(.begin, let x, let y, _):
+                begins.append(CGPoint(x: x, y: y))
+                if begins.count > 16 { begins.removeFirst() }
+            case .button(let button, let pressed):
+                others.append((.button(button.rawValue, phase: pressed ? "down" : "up"), time))
+            case .rotate(let orientation):
+                others.append((.rotate(orientation.rawValue), time))
+            case .touch, .fold:
+                break   // the log has no entry for a fold, and one entry for a whole touch
+            }
+        }
+
+        /// Whether an activity from the log is one that this duorex sent. Call it once for each activity.
+        mutating func claims(_ activity: Activity, time: Double) -> Bool {
+            switch activity {
+            case .tap(let start), .drag(let start, _, _):
+                return begins.contains { abs($0.x - start.x) < 1e-6 && abs($0.y - start.y) < 1e-6 }
+            case .button, .rotate, .other:
+                others.removeAll { time - $0.time > 5 }
+                guard let index = others.firstIndex(where: { $0.activity == activity }) else { return false }
+                others.remove(at: index)
+                return true
+            }
+        }
+    }
+
     /// Something to tell the simulator.
     enum Message {
         /// A finger on the lit panel, at a framebuffer point from 0 to 1.
