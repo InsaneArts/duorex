@@ -97,8 +97,9 @@ final class DuoScene {
         renderer.entities.append(orbit)
 
         camera.camera.fieldOfViewInDegrees = fieldOfView
-        camera.camera.near = 0.01
-        camera.camera.far = 100
+        // The model is in centimeters. In a narrow view the camera stands more than a meter back.
+        camera.camera.near = 1
+        camera.camera.far = 1000
         renderer.entities.append(camera)
         renderer.activeCamera = camera
         renderer.lighting.resource = try StudioLight.environment()
