@@ -143,29 +143,56 @@ nonisolated enum SimWire {
     /// Remembers what this duorex sent. The event log tells every client's actions alike, so
     /// duorex's own come back in it with the others'.
     struct Sent {
-        /// Where the last touches began. A touch in the log is known by the point it began at.
-        private var begins: [CGPoint] = []
+        /// Where this duorex's touches began, each with the time its finger came up. A touch in
+        /// the log is known by the point it began at.
+        private var begins: [(point: CGPoint, up: Double?)] = []
+        /// The last points this duorex's finger moved to or came up at, each with its time.
+        private var moves: [(point: CGPoint, time: Double)] = []
         private var others: [(activity: Activity, time: Double)] = []
 
         mutating func note(_ message: Message, time: Double) {
             switch message {
-            case .touch(.begin, let x, let y, _):
-                begins.append(CGPoint(x: x, y: y))
-                if begins.count > 16 { begins.removeFirst() }
+            case .touch(let phase, let x, let y, _):
+                switch phase {
+                case .begin:
+                    begins.append((CGPoint(x: x, y: y), nil))
+                    if begins.count > 16 { begins.removeFirst() }
+                case .move, .end:
+                    moves.append((CGPoint(x: x, y: y), time))
+                    if moves.count > 64 { moves.removeFirst() }
+                    if phase == .end {
+                        for index in begins.indices where begins[index].up == nil { begins[index].up = time }
+                    }
+                }
             case .button(let button, let pressed):
                 others.append((.button(button.rawValue, phase: pressed ? "down" : "up"), time))
             case .rotate(let orientation):
                 others.append((.rotate(orientation.rawValue), time))
-            case .touch, .fold:
-                break   // the log has no entry for a fold, and one entry for a whole touch
+            case .fold:
+                break   // the log has no entry for a fold
             }
         }
 
         /// Whether an activity from the log is one that this duorex sent. Call it once for each activity.
         mutating func claims(_ activity: Activity, time: Double) -> Bool {
+            func same(_ a: CGPoint, _ b: CGPoint) -> Bool { abs(a.x - b.x) < 1e-6 && abs(a.y - b.y) < 1e-6 }
             switch activity {
             case .tap(let start), .drag(let start, _, _):
-                return begins.contains { abs($0.x - start.x) < 1e-6 && abs($0.y - start.y) < 1e-6 }
+                // The log's entry for a touch comes a moment after the touch. Later, its points are free again.
+                begins.removeAll { touch in touch.up.map { time - $0 > 2 } ?? false }
+                moves.removeAll { time - $0.time > 2 }
+                if begins.contains(where: { same($0.point, start) }) { return true }
+                // The server follows one touch for a device, whoever sends it. So another client's
+                // touch ends this duorex's in the log, and two things follow. The log starts a
+                // new touch where this duorex's finger moves next.
+                if moves.contains(where: { same($0.point, start) }) {
+                    begins.append((start, nil))
+                    return true
+                }
+                // And a touch of the other client becomes a drag when this duorex's finger moves:
+                // that drag goes to the finger.
+                if case .drag(_, let to, _) = activity { return moves.contains { same($0.point, to) } }
+                return false
             case .button, .rotate, .other:
                 others.removeAll { time - $0.time > 5 }
                 guard let index = others.firstIndex(where: { $0.activity == activity }) else { return false }
