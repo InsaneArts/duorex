@@ -40,6 +40,8 @@ final class DuoScene {
     private(set) var pose = Pose()
     /// The corners of the two halves as they are folded now, before the device is tilted or turned.
     private var corners: [SIMD3<Float>] = []
+    /// True while the camera frames a set of poses, not the one pose the device is in.
+    private var isFramed = false
 
     /// A 36 mm sensor behind a 105 mm lens: enough perspective to read as an object, not a diagram.
     private let fieldOfView: Float = 2 * atan(36 / (2 * 105.0)) * 180 / .pi
@@ -152,30 +154,17 @@ final class DuoScene {
     /// Puts the device in a pose. `marks` are the touches to show on `panel`, the lit screen.
     func apply(_ pose: Pose, marks: [Mark] = [], on panel: Panel = .inner) {
         self.pose = pose
+        isFramed = false
         let hinge = min(max(pose.hinge, 0), 180)
-        let raise = Float((180 - hinge) * .pi / 180)
-        // Turn the device so both leaves face the camera equally while it is partly open.
-        let bisect = simd_quatf(angle: -min(raise, Float(hinge * .pi / 180)) / 2, axis: [0, 1, 0])
+        let place = placement(for: pose)
         let step = (180 - hinge) / 180 * Double(Self.foldSteps)
         let lower = min(Int(step), Self.foldSteps - 1)
         var joints = Self.blend(foldPoses[lower], foldPoses[lower + 1], Float(step - Double(lower)))
         if let press = pose.press { buttons.push(press.button, depth: Float(press.depth), in: &joints) }
         body.jointTransforms = joints
-        rest.orientation = bisect * simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
-        // Keep the folded shape centered: the hinge moves off center as one leaf lifts.
-        let half = flatBounds.extents.x / 2
-        let lift = simd_quatf(angle: raise, axis: [0, 1, 0])
-        let lifted = lift.act([-half, 0, 0])
-        let xs = [lifted, .zero, SIMD3<Float>(half, 0, 0)].map { bisect.act($0).x }
-        rest.position.x = -(xs.min()! + xs.max()!) / 2
-        // Each half is a slab behind its part of the inner screen. The halves meet at the hinge.
-        let thickness = flatBounds.extents.z, height = flatBounds.extents.y
-        let back = SIMD3<Float>(0, 0, -thickness), liftedBack = lift.act(back)
-        let section = [.zero, SIMD3(half, 0, 0), back, SIMD3(half, 0, 0) + back, lifted, liftedBack, lifted + liftedBack]
-        corners = section.flatMap { point in
-            let placed = bisect.act(point + SIMD3(0, 0, thickness / 2)) + SIMD3(rest.position.x, 0, 0)
-            return [placed + SIMD3(0, height / 2, 0), placed - SIMD3(0, height / 2, 0)]
-        }
+        rest.orientation = place.turn * simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
+        rest.position.x = place.aside
+        corners = corners(for: pose)
         // The device turns about its own upright axis, and that axis leans toward the user or
         // away. So a drag up or down leans it the same way from the front and from the back.
         orbit.orientation = simd_quatf(angle: Float(pose.pitch * .pi / 180), axis: [1, 0, 0])
@@ -185,9 +174,40 @@ final class DuoScene {
         markLayer.show(marks, on: marks.isEmpty ? [] : surfaces[panel]?.worldLeaves() ?? [])
     }
 
-    /// Draws `pose` into `frame`, and returns when the picture is ready.
-    func draw(_ pose: Pose, marks: [Mark] = [], on panel: Panel = .inner, into frame: Frame) async throws {
+    /// How a pose turns the device to face the camera, and how far it moves it aside.
+    private func placement(for pose: Pose) -> (turn: simd_quatf, aside: Float) {
+        guard !pose.isAnchored else { return (simd_quatf(angle: 0, axis: [0, 1, 0]), 0) }
+        let hinge = Float(min(max(pose.hinge, 0), 180) * .pi / 180)
+        // Turn the device so both leaves face the camera equally while it is partly open.
+        let turn = simd_quatf(angle: -min(.pi - hinge, hinge) / 2, axis: [0, 1, 0])
+        // Keep the folded shape centered: the hinge moves off center as one leaf lifts.
+        let half = flatBounds.extents.x / 2
+        let lifted = simd_quatf(angle: .pi - hinge, axis: [0, 1, 0]).act([-half, 0, 0])
+        let xs = [lifted, .zero, SIMD3<Float>(half, 0, 0)].map { turn.act($0).x }
+        return (turn, -(xs.min()! + xs.max()!) / 2)
+    }
+
+    /// The corners of the two halves in a pose, before the device is tilted or turned.
+    private func corners(for pose: Pose) -> [SIMD3<Float>] {
+        let place = placement(for: pose)
+        let half = flatBounds.extents.x / 2, thickness = flatBounds.extents.z, height = flatBounds.extents.y
+        let lift = simd_quatf(angle: Float((180 - min(max(pose.hinge, 0), 180)) * .pi / 180), axis: [0, 1, 0])
+        // Each half is a slab behind its part of the inner screen. The halves meet at the hinge.
+        let lifted = lift.act([-half, 0, 0])
+        let back = SIMD3<Float>(0, 0, -thickness), liftedBack = lift.act(back)
+        let section = [.zero, SIMD3(half, 0, 0), back, SIMD3(half, 0, 0) + back, lifted, liftedBack, lifted + liftedBack]
+        return section.flatMap { point in
+            let placed = place.turn.act(point + SIMD3(0, 0, thickness / 2)) + SIMD3(place.aside, 0, 0)
+            return [placed + SIMD3(0, height / 2, 0), placed - SIMD3(0, height / 2, 0)]
+        }
+    }
+
+    /// Draws `pose` into `frame`, and returns when the picture is ready. With `framing`, the
+    /// camera stands where all of those poses fit, so pictures of each of them line up.
+    func draw(_ pose: Pose, marks: [Mark] = [], on panel: Panel = .inner, framing: [Pose] = [], into frame: Frame) async throws {
         apply(pose, marks: marks, on: panel)
+        isFramed = !framing.isEmpty
+        if isFramed { corners = framing.flatMap(corners(for:)) }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             do {
                 try render(into: frame) { continuation.resume() }
@@ -198,7 +218,7 @@ final class DuoScene {
     /// Draws one frame of the current pose. `onComplete` runs when the picture is ready, on any thread.
     func render(into frame: Frame, onComplete: @escaping @Sendable () -> Void) throws {
         // Each frame has its own shape, and the camera stands where that shape needs it.
-        camera.position = [0, 0, cameraDistance(aspect: Float(frame.width) / Float(frame.height))]
+        camera.position = cameraPosition(aspect: Float(frame.width) / Float(frame.height))
         try renderer.updateAndRender(deltaTime: 1.0 / 60, cameraOutput: frame.output, onComplete: { _ in onComplete() })
     }
 
@@ -238,6 +258,18 @@ final class DuoScene {
     /// How far back the camera stands for the device to fit a view of this shape.
     /// Held still, the device has a margin around it, and the camera follows a fold or a turn.
     /// A strong tilt uses the margin up, and then the camera backs off to keep every corner in view.
+    /// Where the camera stands. It looks along the z axis at the middle of the view: the
+    /// device's own middle, or the middle of the poses that a picture frames.
+    private func cameraPosition(aspect: Float) -> SIMD3<Float> {
+        guard isFramed else { return [0, 0, cameraDistance(aspect: aspect)] }
+        let tangent = tan(fieldOfView * .pi / 360)
+        let points = corners.map { orbit.orientation.act($0) }
+        let low = points.reduce(points[0]) { simd_min($0, $1) }, high = points.reduce(points[0]) { simd_max($0, $1) }
+        let middle = (low + high) / 2
+        let distance = points.map { $0.z + max(abs($0.x - middle.x) / (tangent * aspect), abs($0.y - middle.y) / tangent) }.max() ?? 1
+        return [middle.x, middle.y, distance * 1.08]
+    }
+
     private func cameraDistance(aspect: Float) -> Float {
         let tangent = tan(fieldOfView * .pi / 360)
         func fit(_ turn: simd_quatf) -> Float {
