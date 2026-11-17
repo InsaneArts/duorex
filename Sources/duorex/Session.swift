@@ -130,7 +130,7 @@ final class Session {
     private func handle(_ event: Pane.Event) {
         switch event {
         case .pointer(let pointer):
-            let point = CGPoint(x: pointer.x / dock.scale, y: pointer.y / dock.scale)
+            let point = dock.point(pixelX: pointer.x, y: pointer.y)
             dock.pointerSeen(at: point)
             // Rex reports the pointer to this pane even when it is over another one, clamped to
             // this pane's edge. Out there, only a drag that began on the device may continue.
