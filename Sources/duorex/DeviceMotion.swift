@@ -170,6 +170,9 @@ nonisolated struct DeviceMotion {
             userOwnsHinge = true
             grab = .fold(from: point, hinge: hinge.value, sign: onFixedLeaf ? 1 : -1)
         } else {
+            // The device stops in the hand, also when it was on its way back to the front.
+            yaw.hold(yaw.value)
+            pitch.hold(pitch.value)
             grab = .tilt(from: point, yaw: yaw.value, pitch: pitch.value)
         }
         return effects
