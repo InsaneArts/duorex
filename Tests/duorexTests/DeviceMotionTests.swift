@@ -83,14 +83,65 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     #expect(abs(motion.pose.hinge - 90) < 0.001)
 }
 
-@Test func `a drag on the background tilts the device, and it springs back`() {
+@Test func `a drag on the background turns the device, and it springs back`() {
     var motion = motion()
     _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
-    _ = motion.pointerMoved(to: CGPoint(x: 150, y: 50), probe: probe)
-    #expect(abs(motion.pose.yaw - 35) < 0.001)
-    #expect(motion.pointerUp(at: CGPoint(x: 150, y: 50), probe: probe).isEmpty)
+    _ = motion.pointerMoved(to: CGPoint(x: 150, y: 90), probe: probe)
+    #expect(abs(motion.pose.yaw - 50) < 0.001)
+    #expect(abs(motion.pose.pitch - 20) < 0.001)
+    #expect(motion.pointerUp(at: CGPoint(x: 150, y: 90), probe: probe).isEmpty)
     _ = run(&motion, from: 100, seconds: 4)
     #expect(motion.pose.yaw == 0)
+    #expect(motion.pose.pitch == 0)
+}
+
+@Test func `a long drag turns the device all the way round`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+    _ = motion.pointerMoved(to: CGPoint(x: 410, y: 50), probe: probe)
+    // Half a turn: the user looks at the back.
+    #expect(abs(motion.pose.yaw - 180) < 0.001)
+    _ = motion.pointerMoved(to: CGPoint(x: 750, y: 50), probe: probe)
+    #expect(abs(motion.pose.yaw - 350) < 0.001)
+}
+
+@Test func `a turned device comes back to the front by the shorter way`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+    // 250 degrees one way is 110 degrees the other way.
+    _ = motion.pointerMoved(to: CGPoint(x: 550, y: 50), probe: probe)
+    _ = motion.pointerUp(at: CGPoint(x: 550, y: 50), probe: probe)
+    #expect(abs(motion.pose.yaw + 110) < 0.001)
+    var time = 100.0, furthest = 0.0, past = 0.0
+    while time < 104 {
+        time += 1.0 / 60
+        _ = motion.step(to: time)
+        furthest = min(furthest, motion.pose.yaw)
+        past = max(past, motion.pose.yaw)
+    }
+    #expect(furthest >= -110.001)
+    // From far away it arrives without a swing past the front.
+    #expect(past < 2)
+    #expect(motion.pose.yaw == 0)
+}
+
+@Test func `after a long way back, a small tilt bounces again`() {
+    var motion = motion()
+    _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+    _ = motion.pointerMoved(to: CGPoint(x: 550, y: 50), probe: probe)
+    _ = motion.pointerUp(at: CGPoint(x: 550, y: 50), probe: probe)
+    _ = run(&motion, from: 100, seconds: 4)
+    // A small tilt, let go.
+    _ = motion.pointerDown(at: CGPoint(x: 50, y: 50), option: false, probe: probe)
+    _ = motion.pointerMoved(to: CGPoint(x: 90, y: 50), probe: probe)
+    _ = motion.pointerUp(at: CGPoint(x: 90, y: 50), probe: probe)
+    var time = 104.0, past = 0.0
+    while time < 108 {
+        time += 1.0 / 60
+        _ = motion.step(to: time)
+        past = min(past, motion.pose.yaw)
+    }
+    #expect(past < -1)
 }
 
 @Test func `the wheel moves a finger that lifts when the wheel stops`() {

@@ -175,8 +175,10 @@ final class DuoScene {
             let placed = bisect.act(point + SIMD3(0, 0, thickness / 2)) + SIMD3(rest.position.x, 0, 0)
             return [placed + SIMD3(0, height / 2, 0), placed - SIMD3(0, height / 2, 0)]
         }
-        orbit.orientation = simd_quatf(angle: Float(pose.yaw * .pi / 180), axis: [0, 1, 0])
-            * simd_quatf(angle: Float(pose.pitch * .pi / 180), axis: [1, 0, 0])
+        // The device turns about its own upright axis, and that axis leans toward the user or
+        // away. So a drag up or down leans it the same way from the front and from the back.
+        orbit.orientation = simd_quatf(angle: Float(pose.pitch * .pi / 180), axis: [1, 0, 0])
+            * simd_quatf(angle: Float(pose.yaw * .pi / 180), axis: [0, 1, 0])
             * simd_quatf(angle: Float(pose.roll * .pi / 180), axis: [0, 0, 1])
         // The marks lie on the screen, so they are placed last, on the screen as it is now.
         markLayer.show(marks, on: marks.isEmpty ? [] : surfaces[panel]?.worldLeaves() ?? [])
