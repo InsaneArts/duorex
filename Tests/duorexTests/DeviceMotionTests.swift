@@ -208,12 +208,12 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
 @Test func `the button under a resting pointer is known`() {
     var motion = motion()
     _ = motion.pointerMoved(to: powerButton, probe: probe)
-    #expect(motion.hovered == .button(.power))
+    #expect(motion.hoveredButton == .power)
     _ = motion.pointerMoved(to: CGPoint(x: 50, y: 50), probe: probe)
-    #expect(motion.hovered == nil)
+    #expect(motion.hoveredButton == nil)
     _ = motion.pointerMoved(to: powerButton, probe: probe)
     motion.pointerLeft()
-    #expect(motion.hovered == nil)
+    #expect(motion.hoveredButton == nil)
 }
 
 @Test func `a press after a lost release lets the held button go first`() {
@@ -285,21 +285,6 @@ private func run(_ motion: inout DeviceMotion, from start: Double, seconds: Doub
     // The press lands on the background before any report of the move there.
     _ = motion.pointerDown(at: CGPoint(x: 60, y: 300), option: true, probe: probe)
     #expect(motion.fingers.isEmpty)
-}
-
-@Test func `the frame under a resting pointer is known, so the user learns that a drag there folds`() {
-    var motion = motion()
-    // The left edge of the frame.
-    _ = motion.pointerMoved(to: CGPoint(x: 185, y: 300), probe: probe)
-    #expect(motion.hovered == .frame)
-    // On the glass a press touches, and on the background a drag turns the device.
-    _ = motion.pointerMoved(to: CGPoint(x: 400, y: 300), probe: probe)
-    #expect(motion.hovered == nil)
-    _ = motion.pointerMoved(to: CGPoint(x: 40, y: 40), probe: probe)
-    #expect(motion.hovered == nil)
-    _ = motion.pointerMoved(to: CGPoint(x: 185, y: 300), probe: probe)
-    motion.pointerLeft()
-    #expect(motion.hovered == nil)
 }
 
 // MARK: Sound
