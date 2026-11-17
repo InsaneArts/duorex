@@ -62,6 +62,8 @@ nonisolated enum SimWire {
 
     /// What the simulator reports about its pose.
     struct Report: Decodable, Equatable {
+        /// The width of the lit panel's framebuffer, in pixels. It tells which panel the report is about.
+        var width: Int?
         /// How the interface is turned inside the lit panel's framebuffer.
         var orientation: String
         var hingeDegrees: Double?

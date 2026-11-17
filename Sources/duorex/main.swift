@@ -65,6 +65,19 @@ case "snapshot":
         } catch { fail(error) }
     }
     dispatchMain()
+case "sweep":
+    Task {
+        do {
+            let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
+            let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+            let shots = try await Sweep(sim: Sim(base: address), scene: scene).run { print($0) }
+            let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-sweep.png")
+            try ContactSheet.write(shots, to: out)
+            print(out.path)
+            exit(0)
+        } catch { fail(error) }
+    }
+    RunLoop.main.run()
 case "view":
     NSApplication.shared.setActivationPolicy(.accessory)
     Task {
@@ -82,6 +95,6 @@ case "view":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex update\n       duorex version\n".utf8))
+    FileHandle.standardError.write(Data("usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]\n       duorex sweep [--out sheet.png] [--device name|udid] [--server url]\n       duorex update\n       duorex version\n".utf8))
     exit(2)
 }

@@ -56,9 +56,9 @@ private func fields(_ message: SimWire.Message) throws -> (tag: UInt8, json: [St
 @Test func `the simulator's report decodes`() {
     let json = #"{"width":2007,"height":2853,"orientation":"landscape_left","hingeDegrees":130,"duoViewOrientation":"portrait"}"#
     #expect(SimWire.report(from: Data([0x82]) + Data(json.utf8)) ==
-        SimWire.Report(orientation: "landscape_left", hingeDegrees: 130, duoViewOrientation: "portrait"))
+        SimWire.Report(width: 2007, orientation: "landscape_left", hingeDegrees: 130, duoViewOrientation: "portrait"))
     #expect(SimWire.report(from: Data([0x82]) + Data(#"{"width":1398,"height":2034,"orientation":"portrait"}"#.utf8)) ==
-        SimWire.Report(orientation: "portrait"))
+        SimWire.Report(width: 1398, orientation: "portrait"))
     #expect(SimWire.report(from: Data([0x84]) + Data(json.utf8)) == nil)
 }
 
