@@ -49,8 +49,9 @@ final class DuoScene {
     private static let foldSteps = 90
     /// How near the pointer must be to a button to be on it, as a share of the device's height.
     private static let buttonReach: Float = 0.08
-    /// How far past the glass still counts as the frame, in framebuffer units.
-    private static let frameWidth: Float = 0.09
+    /// How far past the glass still counts as the frame, in framebuffer units: the frame as
+    /// drawn, and a little more to make it easy to take hold of. Past that, a drag turns the device.
+    private static let frameWidth: Float = 0.055
     private static let screenMaterials: [Panel: String] = [.cover: "YqugYDOqMSOpqyA", .inner: "CvyXbAGXoolRUYl"]
 
     /// Apple's Duo model inside the selected Xcode. It is read in place and never copied.
