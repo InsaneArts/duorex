@@ -19,15 +19,15 @@ enum SimServer {
 
     private static func udid(for device: String, create: Bool) async throws -> String {
         if UUID(uuidString: device) != nil { return device }
-        let list = try await run("/usr/bin/xcrun", "simctl", "list", "devices", "available", "--json")
+        let list = try await Shell.run("/usr/bin/xcrun", ["simctl", "list", "devices", "available", "--json"])
         let devices = (try? JSONSerialization.jsonObject(with: Data(list.utf8)) as? [String: Any])?["devices"] as? [String: [[String: Any]]] ?? [:]
         if let found = devices.values.joined().first(where: { $0["name"] as? String == device }), let udid = found["udid"] as? String { return udid }
         guard create else { throw DuoError.sim("no simulator is named \"\(device)\"") }
-        return try await run("/usr/bin/xcrun", "simctl", "create", device, duoType, try await newestDuoRuntime())
+        return try await Shell.run("/usr/bin/xcrun", ["simctl", "create", device, duoType, try await newestDuoRuntime()])
     }
 
     private static func newestDuoRuntime() async throws -> String {
-        let list = try await run("/usr/bin/xcrun", "simctl", "list", "runtimes", "available", "--json")
+        let list = try await Shell.run("/usr/bin/xcrun", ["simctl", "list", "runtimes", "available", "--json"])
         let runtimes = (try? JSONSerialization.jsonObject(with: Data(list.utf8)) as? [String: Any])?["runtimes"] as? [[String: Any]] ?? []
         let fitting = runtimes.filter { runtime in
             (runtime["supportedDeviceTypes"] as? [[String: Any]] ?? []).contains { $0["identifier"] as? String == duoType }
@@ -52,38 +52,14 @@ enum SimServer {
         let arguments = ["--detach", udid, "--port", "3100"]
         // An installed serve-sim wins. Otherwise npx fetches the release duorex was written against.
         let output: String
-        if let installed = try? await run("/usr/bin/env", ["serve-sim"] + arguments) {
+        if let installed = try? await Shell.run("/usr/bin/env", ["serve-sim"] + arguments) {
             output = installed
         } else {
-            output = try await run("/usr/bin/env", ["npx", "--yes", package] + arguments)
+            output = try await Shell.run("/usr/bin/env", ["npx", "--yes", package] + arguments)
         }
         guard let line = output.split(separator: "\n").last(where: { $0.hasPrefix("{") }),
               let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
               let port = json["port"] as? Int else { throw DuoError.sim("serve-sim did not start: \(output.suffix(300))") }
         return port
-    }
-
-    private static func run(_ tool: String, _ arguments: String...) async throws -> String { try await run(tool, arguments) }
-
-    /// Runs a tool and returns what it printed. Throws when the tool is missing or fails.
-    private static func run(_ tool: String, _ arguments: [String]) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: tool)
-            process.arguments = arguments
-            let output = Pipe()
-            process.standardOutput = output
-            process.standardError = output
-            process.standardInput = FileHandle.nullDevice
-            process.terminationHandler = { process in
-                let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-                if process.terminationStatus == 0 {
-                    continuation.resume(returning: text)
-                } else {
-                    continuation.resume(throwing: DuoError.sim("\(arguments.first ?? tool) failed: \(text.suffix(300))"))
-                }
-            }
-            do { try process.run() } catch { continuation.resume(throwing: error) }
-        }
     }
 }
