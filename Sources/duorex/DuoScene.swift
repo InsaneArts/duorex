@@ -38,6 +38,8 @@ final class DuoScene {
     private let surfaces: [Panel: ScreenSurface]
     private let flatBounds: BoundingBox
     private(set) var pose = Pose()
+    /// How much nearer than its fit the camera stands. A film moves in and out with it.
+    var zoom: Float = 1
     /// The corners of the two halves as they are folded now, before the device is tilted or turned.
     private var corners: [SIMD3<Float>] = []
     /// True while the camera frames a set of poses, not the one pose the device is in.
@@ -132,8 +134,9 @@ final class DuoScene {
         apply(pose)
     }
 
-    /// Shows `texture` on a screen, or turns the screen off with nil.
-    func setScreen(_ panel: Panel, texture: TextureResource?) {
+    /// Shows `texture` on a screen, or turns the screen off with nil. `brightness` is from 0,
+    /// which is black, to 1.
+    func setScreen(_ panel: Panel, texture: TextureResource?, brightness: Double = 1) {
         guard let slot = slots[panel] else { return }
         // The screen is a light source: unlit, and outside the tone mapping the body gets.
         var material = UnlitMaterial(applyPostProcessToneMap: false)
@@ -144,7 +147,7 @@ final class DuoScene {
             sampler.magFilter = .linear
             sampler.mipFilter = .linear
             sampler.maxAnisotropy = 8
-            material.color = .init(tint: .white, texture: .init(texture, sampler: .init(sampler)))
+            material.color = .init(tint: NSColor(white: brightness, alpha: 1), texture: .init(texture, sampler: .init(sampler)))
         } else {
             material.color = .init(tint: .black)
         }
@@ -261,7 +264,7 @@ final class DuoScene {
     /// Where the camera stands. It looks along the z axis at the middle of the view: the
     /// device's own middle, or the middle of the poses that a picture frames.
     private func cameraPosition(aspect: Float) -> SIMD3<Float> {
-        guard isFramed else { return [0, 0, cameraDistance(aspect: aspect)] }
+        guard isFramed else { return [0, 0, cameraDistance(aspect: aspect) / zoom] }
         let tangent = tan(fieldOfView * .pi / 360)
         let points = corners.map { orbit.orientation.act($0) }
         let low = points.reduce(points[0]) { simd_min($0, $1) }, high = points.reduce(points[0]) { simd_max($0, $1) }
