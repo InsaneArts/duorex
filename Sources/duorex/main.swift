@@ -122,7 +122,7 @@ case "view", "record":
             let running = try Session(scene: try await scene(), movie: movie)
             session = running
             running.start()
-            guard !arguments.flag("pattern") else { return }
+            guard !arguments.flag("pattern") else { return running.showKeys() }
             do {
                 running.attach(to: try await SimServer.address(device: arguments.string("device"), server: arguments.string("server")))
             } catch {
