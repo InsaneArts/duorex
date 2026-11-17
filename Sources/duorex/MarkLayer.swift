@@ -8,8 +8,9 @@ final class MarkLayer {
     let root = Entity()
 
     private let mesh = MeshResource.generatePlane(width: 1, height: 1)
-    private let spot: TextureResource
-    private let ring: TextureResource
+    /// The two looks of a mark. A material is slow to make and fast to copy, so they are made once.
+    private let spot: UnlitMaterial
+    private let ring: UnlitMaterial
     /// The discs are kept and used again. More are made when a frame needs more.
     private var discs: [ModelEntity] = []
 
@@ -20,7 +21,7 @@ final class MarkLayer {
     private static let accent = CGColor(srgbRed: 1, green: 0.4, blue: 0.08, alpha: 1)
 
     init() throws {
-        spot = try Self.texture { context, size in
+        spot = try Self.material { context, size in
             // A white rim inside a dark edge keeps the spot readable on any screen, light or dark.
             let whole = CGRect(x: 0, y: 0, width: size, height: size)
             context.setFillColor(CGColor(gray: 0, alpha: 0.25))
@@ -30,7 +31,7 @@ final class MarkLayer {
             context.setFillColor(Self.accent)
             context.fillEllipse(in: whole.insetBy(dx: size * 0.15, dy: size * 0.15))
         }
-        ring = try Self.texture { context, size in
+        ring = try Self.material { context, size in
             let circle = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.09, dy: size * 0.09)
             context.setStrokeColor(CGColor(gray: 0, alpha: 0.2))
             context.setLineWidth(size * 0.13)
@@ -61,9 +62,7 @@ final class MarkLayer {
             let width = Float(mark.radius) * 2 * min(simd_length(place.across), simd_length(place.down))
             disc.transform = Transform(scale: SIMD3(repeating: width), rotation: simd_quatf(from: [0, 0, 1], to: normal),
                                        translation: place.point + normal * Self.lift * (1 + Float(index) * 0.1))
-            // Like the screen, a mark is a light: unlit, and outside the tone mapping the body gets.
-            var material = UnlitMaterial(applyPostProcessToneMap: false)
-            material.color = .init(tint: .white, texture: .init(mark.isRing ? ring : spot))
+            var material = mark.isRing ? ring : spot
             material.blending = .transparent(opacity: .init(floatLiteral: Float(mark.opacity)))
             disc.model?.materials = [material]
             disc.isEnabled = true
@@ -74,14 +73,19 @@ final class MarkLayer {
         SIMD2(Float(mark.point.x), Float(mark.point.y))
     }
 
-    /// A square picture with a clear background, drawn by `draw` in a context of `size` pixels each way.
-    private static func texture(_ draw: (CGContext, CGFloat) -> Void) throws -> TextureResource {
+    /// A material that shows a square picture with a clear background, drawn by `draw` in a
+    /// context of `size` pixels each way.
+    private static func material(_ draw: (CGContext, CGFloat) -> Void) throws -> UnlitMaterial {
         let size = 256
         guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { throw DuoError.render("could not draw a touch mark") }
         draw(context, CGFloat(size))
         guard let image = context.makeImage() else { throw DuoError.render("could not draw a touch mark") }
-        return try TextureResource(image: image, options: .init(semantic: .color))
+        // Like the screen, a mark is a light: unlit, and outside the tone mapping the body gets.
+        var material = UnlitMaterial(applyPostProcessToneMap: false)
+        material.color = .init(tint: .white, texture: .init(try TextureResource(image: image, options: .init(semantic: .color))))
+        material.blending = .transparent(opacity: 1.0)
+        return material
     }
 }
