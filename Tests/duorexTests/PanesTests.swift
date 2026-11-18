@@ -29,3 +29,10 @@ private func folder() -> URL {
     // Its file is gone too, so a new process with the same number is not taken for it.
     #expect(!Panes.isOpen(in: "work", folder: folder) { _ in true })
 }
+
+@Test func `a file whose process is alive but is not duorex is not a pane`() {
+    let folder = folder()
+    // The pane died without a word, and another program got its process number: this test's own, here.
+    Panes.opened(in: "work", process: getpid(), folder: folder)
+    #expect(!Panes.isOpen(in: "work", folder: folder))
+}

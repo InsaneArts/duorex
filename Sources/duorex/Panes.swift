@@ -17,8 +17,16 @@ nonisolated enum Panes {
         try? FileManager.default.removeItem(at: folder.appendingPathComponent("\(process)"))
     }
 
+    /// True when a process runs and is duorex. A process number is used again after its
+    /// process ends, so a number that is alive does not prove that the pane is.
+    static func isDuorex(_ process: Int32) -> Bool {
+        var name = [CChar](repeating: 0, count: 256)
+        guard proc_name(process, &name, UInt32(name.count)) > 0 else { return false }
+        return String(cString: name) == "duorex"
+    }
+
     /// Whether a pane is open in a Rex session. A pane that ended without a word is forgotten here.
-    static func isOpen(in session: String, folder: URL = folder, isRunning: (Int32) -> Bool = { kill($0, 0) == 0 }) -> Bool {
+    static func isOpen(in session: String, folder: URL = folder, isRunning: (Int32) -> Bool = isDuorex) -> Bool {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         return names.contains { name in
             guard let process = Int32(name), isRunning(process) else {
