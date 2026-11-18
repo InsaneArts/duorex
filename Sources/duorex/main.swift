@@ -72,8 +72,9 @@ func showPane(device: String) async throws -> String {
     return "opened a duorex pane beside this one"
 }
 
-func usage(_ text: String) -> DuoError {
-    .terminal("usage: duorex \(text)")
+/// Ends duorex with how to use a command. Arguments are checked before the simulator is asked for anything.
+func wrongUse(_ text: String) -> Never {
+    fail(DuoError.terminal("usage: duorex \(text)"))
 }
 
 func scene() async throws -> DuoScene {
@@ -152,18 +153,19 @@ case "screenshot":
         return out.path
     }
 case "tap":
+    guard let point = arguments.numbers(2), point.allSatisfy({ (0...1).contains($0) }) else { wrongUse("tap X Y, each from 0 to 1 on the newest screenshot") }
     onSimulator { driver in
-        guard let point = arguments.numbers(2), point.allSatisfy({ (0...1).contains($0) }) else { throw usage("tap X Y, each from 0 to 1 on the upright screen") }
         await driver.tap(at: CGPoint(x: point[0], y: point[1]))
         await settle()
         return "tapped \(point[0]) \(point[1])"
     }
 case "swipe":
+    let seconds = arguments.double("seconds", default: 0.25)
+    guard let points = arguments.numbers(4), points.allSatisfy({ (0...1).contains($0) }), seconds.isFinite, (0...10).contains(seconds) else {
+        wrongUse("swipe X1 Y1 X2 Y2 [--seconds 0.25], each point from 0 to 1 on the newest screenshot")
+    }
     onSimulator { driver in
-        guard let points = arguments.numbers(4), points.allSatisfy({ (0...1).contains($0) }) else {
-            throw usage("swipe X1 Y1 X2 Y2 [--seconds 0.25], each from 0 to 1 on the upright screen")
-        }
-        await driver.swipe(from: CGPoint(x: points[0], y: points[1]), to: CGPoint(x: points[2], y: points[3]), seconds: arguments.double("seconds", default: 0.25))
+        await driver.swipe(from: CGPoint(x: points[0], y: points[1]), to: CGPoint(x: points[2], y: points[3]), seconds: seconds)
         await settle()
         return "swiped \(points[0]) \(points[1]) to \(points[2]) \(points[3])"
     }
@@ -174,28 +176,34 @@ case "home":
         return "went home"
     }
 case "fold":
+    let postures = ["shut": 0.0, "closed": 0, "book": 130, "open": 180]
+    guard let word = arguments.words.first, let target = postures[word] ?? Double(word), (0...180).contains(target) else {
+        wrongUse("fold closed|book|open, or an angle from 0 to 180")
+    }
     onSimulator { driver in
-        let named = ["shut": 0.0, "closed": 0, "book": 130, "open": 180]
-        guard let word = arguments.words.first, let target = named[word] ?? Double(word), (0...180).contains(target) else {
-            throw usage("fold closed|book|open, or an angle from 0 to 180")
-        }
         let start = driver.report?.hingeDegrees ?? (driver.litPanel == .cover ? 0 : 180)
-        guard await driver.fold(from: start, to: target) else { throw DuoError.sim("the simulator did not fold to \(Int(target)) degrees.") }
+        guard await driver.fold(from: start, to: target) else {
+            try Task.checkCancellation()
+            throw DuoError.sim("the simulator did not fold to \(Int(target)) degrees.")
+        }
         _ = await driver.settledScreen()
         return "folded to \(Int(target))"
     }
 case "rotate":
+    let holds: [String: Orientation] = ["upright": .portrait, "clockwise": .landscapeLeft, "upside-down": .upsideDown, "counterclockwise": .landscapeRight]
+    guard let held = arguments.words.first.flatMap({ holds[$0] }) else { wrongUse("rotate upright|clockwise|upside-down|counterclockwise") }
     onSimulator { driver in
-        let named: [String: Orientation] = ["upright": .portrait, "clockwise": .landscapeLeft, "upside-down": .upsideDown, "counterclockwise": .landscapeRight]
-        guard let held = arguments.words.first.flatMap({ named[$0] }) else { throw usage("rotate upright|clockwise|upside-down|counterclockwise") }
-        guard await driver.turn(to: held) else { throw DuoError.sim("the simulator did not turn.") }
+        guard await driver.turn(to: held) else {
+            try Task.checkCancellation()
+            throw DuoError.sim("the simulator did not turn.")
+        }
         _ = await driver.settledScreen()
         return "held \(held.label)"
     }
 case "press":
+    let buttons: [String: HardwareButton] = ["power": .power, "volume-up": .volumeUp, "volume-down": .volumeDown, "camera": .cameraControl]
+    guard let button = arguments.words.first.flatMap({ buttons[$0] }) else { wrongUse("press power|volume-up|volume-down|camera") }
     onSimulator { driver in
-        let named: [String: HardwareButton] = ["power": .power, "volume-up": .volumeUp, "volume-down": .volumeDown, "camera": .cameraControl]
-        guard let button = arguments.words.first.flatMap({ named[$0] }) else { throw usage("press power|volume-up|volume-down|camera") }
         await driver.press(button)
         await settle()
         return "pressed \(button.rawValue.lowercased())"
