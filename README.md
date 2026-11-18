@@ -97,20 +97,25 @@ duorex runs in the pane as a terminal program and draws the device in a window o
 
 Move the Rex window or change the layout and the device follows. Switch to another tab and it hides.
 
-## Your agent uses the same device
+## Your agent runs your app on it
 
-duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve-sim), so an agent in the next pane can drive it from the shell while you watch:
+duorex is where your agent tries its work, not only a simulator to look at. Tell your agent in Rex to run the app on the Duo. It runs `duorex run`, which builds the Xcode project, starts the app on the Duo, and opens the duorex pane beside the agent's pane. Then the agent uses the app, and you watch.
 
 ```sh
-npx serve-sim tap 0.5 0.4    # a point on the screen, from 0 to 1
-npx serve-sim fold 130
+duorex run                       # build the project in this folder, start the app, open the pane
+duorex screenshot                # the screen, upright, as a PNG for the agent to read
+duorex tap 0.46 0.57             # a point on that screenshot, each number from 0 to 1
+duorex swipe 0.5 0.8 0.5 0.3
+duorex fold book                 # shut, book, open, or an angle
+duorex rotate clockwise
+duorex sweep --out sweep.png     # every posture in one picture
 ```
 
-When the agent folds the device, the one in your pane folds too. When it touches the screen, you see where: a tap leaves a spot with a ring, and a swipe leaves a trail. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark.
+When the agent touches the screen, you see where: a tap leaves a spot with a ring, and a swipe leaves a trail. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark. The marks are part of the device, so `duorex record` puts them in the movie too. When the agent folds the device, the one in your pane folds too.
 
-The marks are part of the device, so `duorex record` puts them in the movie too.
+The installer gives Claude Code, Codex and pi a skill named `duorex`. It tells them these commands and when to use them, so "run it on the Duo" is enough.
 
-The agent can also run `duorex sweep` and read the sheet, to check its own work in every posture.
+duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve-sim). A tool that drives the simulator through serve-sim shows in the pane the same way.
 
 ## Install
 
@@ -144,7 +149,7 @@ duorex update
 
 ```sh
 rm -f ~/.local/bin/duorex ~/.config/rex/duorex.lua
-rm -rf ~/.local/share/duorex
+rm -rf ~/.local/share/duorex ~/.claude/skills/duorex ~/.codex/skills/duorex ~/.pi/agent/skills/duorex
 defaults delete duorex 2>/dev/null   # the saved pane position
 ```
 
@@ -199,7 +204,7 @@ swift test
 .build/debug/duorex snapshot --pattern --touch 0.3,0.4 --out tap.png   # the same, with a touch mark
 ```
 
-The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
+The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
 
 ## License
 
