@@ -88,6 +88,8 @@ final class SimDriver {
     func connect() async throws -> (hinge: Double, held: Orientation) {
         sim.start()
         guard await wait(seconds: 20, until: { frame != nil && report != nil }) else {
+            // A wait that was cut short by Ctrl-C is not the simulator's fault.
+            try Task.checkCancellation()
             throw DuoError.sim("the simulator sent no picture. Is it booted?")
         }
         // A server that just started reports the hinge a moment after its first report.
