@@ -47,6 +47,10 @@ nonisolated enum Shell {
         process.standardOutput = output
         process.standardError = errors
         process.standardInput = FileHandle.nullDevice
+        // Without a list of its own, the child reads this process's list as it starts. Apple's
+        // USD library adds a hundred variables while it loads the model, and a tool that starts
+        // at that moment fails with "Bad address".
+        process.environment = ProcessInfo.processInfo.environment
         do { try process.run() } catch { throw Failure(tool: name, reason: error.localizedDescription) }
 
         // Both pipes are read to the end before the wait. A child that fills a pipe nobody

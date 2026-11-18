@@ -48,6 +48,8 @@ final class RexHost {
         let pipe = Pipe()
         events.standardOutput = pipe
         events.standardError = FileHandle.nullDevice
+        // A list of its own, as in `Shell`: the model loads while this starts.
+        events.environment = ProcessInfo.processInfo.environment
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let text = String(decoding: handle.availableData, as: UTF8.self)
             guard Self.layoutEvents.contains(where: { text.contains("\"type\":\"\($0)\"") }) else { return }
