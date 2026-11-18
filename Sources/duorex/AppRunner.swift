@@ -65,6 +65,7 @@ nonisolated enum AppRunner {
             try await Shell.result("/usr/bin/xcrun", ["xcodebuild"] + arguments, in: directory)
         }
         let list = try await xcodebuild(["-list", "-json"] + container)
+        guard list.status == 0 else { throw DuoError.sim("xcodebuild could not read the project.\n" + String(list.errors.suffix(800))) }
         let scheme = try scheme(fromList: Data(list.output.utf8), wanted: wanted)
         let target = container + ["-scheme", scheme, "-configuration", "Debug", "-destination", "platform=iOS Simulator,id=\(udid)"]
         progress("building \(scheme)")
@@ -74,6 +75,7 @@ nonisolated enum AppRunner {
             throw DuoError.sim("the build failed.\n" + (errors.isEmpty ? String((build.output + "\n" + build.errors).suffix(1500)) : errors.prefix(12).joined(separator: "\n")))
         }
         let settings = try await xcodebuild(["-showBuildSettings", "-json"] + target)
+        guard settings.status == 0 else { throw DuoError.sim("xcodebuild could not say where the app is.\n" + String(settings.errors.suffix(800))) }
         return try product(fromSettings: Data(settings.output.utf8), scheme: scheme)
     }
 
