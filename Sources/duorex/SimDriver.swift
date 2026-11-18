@@ -92,8 +92,15 @@ final class SimDriver {
             try Task.checkCancellation()
             throw DuoError.sim("the simulator sent no picture. Is it booted?")
         }
-        // A server that just started reports the hinge a moment after its first report.
-        _ = await wait(seconds: 3) { report?.hingeDegrees != nil }
+        // A server that just started reports the hinge a moment after its first report. With
+        // Xcode 27.2 it never does: serve-sim reads the hinge with a tool that Xcode no longer
+        // has, and then knows the angle only once a fold went through it. Until then it also
+        // leaves out how the device is held, so no turn can be checked. Such a server is told
+        // the angle that the lit panel shows, as `PoseSync` does for the pane.
+        if !(await wait(seconds: 3) { report?.hingeDegrees != nil }) {
+            let shown: Double = litPanel == .cover ? 0 : 180
+            _ = await fold(from: shown, to: shown)
+        }
         return (report?.hingeDegrees ?? (litPanel == .cover ? 0 : 180),
                 report?.duoViewOrientation.flatMap(Orientation.init(rawValue:)) ?? .portrait)
     }
