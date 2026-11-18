@@ -40,6 +40,6 @@ The version is one line in `Sources/duorex/Release.swift`. A release is the tag 
 2. In `CHANGELOG.md`, rename `## Unreleased` to `## ` plus the version.
 3. Merge these two changes as a pull request.
 4. On the main branch, run `scripts/release.sh --dry-run`. It checks the repository, runs the tests, and shows the release notes.
-5. Run `scripts/release.sh`. It tags the commit, pushes the tag, and publishes the release on GitHub.
+5. Run `scripts/release.sh`. It tags the commit, pushes the tag, and publishes the release on GitHub. If it stops after the tag, run it again: it goes on from the tag.
 
 After step 5, `duorex update` installs the new version.

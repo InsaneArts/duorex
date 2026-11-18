@@ -1,6 +1,7 @@
 #!/bin/sh
 # Releases the version that Sources/duorex/Release.swift names. It checks that the repository
 # is ready, tags the commit, and publishes the release with its notes from CHANGELOG.md.
+# A release that stopped after the tag goes on from there when you run the script again.
 #
 #   scripts/release.sh --dry-run   # only check, and show what a release would do
 #   scripts/release.sh             # release
@@ -18,6 +19,8 @@ main() {
     *) fail "usage: scripts/release.sh [--dry-run]" ;;
   esac
   cd "$(dirname "$0")/.."
+  command -v gh >/dev/null 2>&1 || fail "the GitHub CLI is missing. Install it with: brew install gh"
+  gh auth status >/dev/null 2>&1 || fail "the GitHub CLI is not logged in. Run: gh auth login"
 
   version=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/duorex/Release.swift)
   echo "$version" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' || fail "Release.swift has no version of the form 1.2.3."
@@ -27,8 +30,14 @@ main() {
   [ -z "$(git status --porcelain)" ] || fail "the working tree is not clean. Commit or remove your changes first."
   git fetch --quiet --tags origin
   [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || fail "main here is not main on GitHub. Pull or push first."
+  if gh release view "$tag" >/dev/null 2>&1; then
+    fail "duorex $version is released. Change the version in Release.swift."
+  fi
+  # A tag on this commit is from a release that stopped before it was published.
+  tagged=
   if git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null; then
-    fail "$tag exists. Change the version in Release.swift."
+    [ "$(git rev-parse "$tag^{commit}")" = "$(git rev-parse HEAD)" ] || fail "$tag is on another commit. Change the version in Release.swift."
+    tagged=1
   fi
 
   # Only tags of the form v1.2.3 are releases, as in install.sh. The new one must be the newest.
@@ -48,15 +57,18 @@ main() {
   [ "$built" = "$version" ] || fail "the build says it is $built, not $version."
 
   if [ -n "$dry" ]; then
-    echo "Ready. A release would tag $(git rev-parse --short HEAD) as $tag, push the tag, and publish these notes:"
+    step="tag $(git rev-parse --short HEAD) as $tag"
+    [ -z "$tagged" ] || step="use the tag $tag, which is on this commit"
+    echo "Ready. A release would $step, push the tag, and publish these notes:"
     printf '%s\n' "$notes"
     return
   fi
 
-  git tag --annotate "$tag" --message "duorex $version"
-  git push --quiet origin "$tag"
+  [ -n "$tagged" ] || git tag --annotate "$tag" --message "duorex $version"
+  git push --quiet origin "refs/tags/$tag" || fail "$tag is on this Mac only. Run scripts/release.sh again to push it and publish the release."
   # --verify-tag: publish for the tag that was just pushed, or not at all.
-  printf '%s\n' "$notes" | gh release create "$tag" --verify-tag --title "duorex $version" --notes-file -
+  printf '%s\n' "$notes" | gh release create "$tag" --verify-tag --title "duorex $version" --notes-file - \
+    || fail "$tag is pushed, but the release is not published. Run scripts/release.sh again to publish it."
   echo "Released duorex $version. \`duorex update\` now installs it."
 }
 
