@@ -98,16 +98,17 @@ final class SimDriver {
         // leaves out how the device is held, so no turn can be checked. Such a server is told
         // the angle that the lit panel shows, as `PoseSync` does for the pane.
         if !(await wait(seconds: 3) { report?.hingeDegrees != nil }) {
+            // The simulator perhaps started with the server. A new one shows an Apple logo for one
+            // or two minutes, also after Xcode calls it booted. Its picture is not worth taking,
+            // and a fold sent meanwhile is acted on late.
+            _ = await wait(seconds: 90) { screen.map { !Self.isBootScreen($0) } ?? false }
+            // A fold that comes too early is dropped, so it goes out until it lands.
             let shown: Double = litPanel == .cover ? 0 : 180
-            // The simulator perhaps started with the server. While it boots it drops the fold,
-            // so the fold goes out until it lands.
             let deadline = Date().addingTimeInterval(60)
             while report?.hingeDegrees == nil, Date() < deadline, !Task.isCancelled {
                 sim.send(.fold(degrees: shown))
                 _ = await wait(seconds: 1) { report?.hingeDegrees != nil }
             }
-            // A new simulator shows an Apple logo for about a minute. Its picture is not worth taking.
-            _ = await wait(seconds: 15) { screen.map { !Self.isBootScreen($0) } ?? false }
         }
         return (report?.hingeDegrees ?? (litPanel == .cover ? 0 : 180),
                 report?.duoViewOrientation.flatMap(Orientation.init(rawValue:)) ?? .portrait)
