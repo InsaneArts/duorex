@@ -152,7 +152,7 @@ defaults delete duorex 2>/dev/null   # the saved pane position, sound and glow
 Delete the two lines from `~/.config/rex/init.lua` if you added them. serve-sim keeps running after duorex quits. To stop it and delete the simulator:
 
 ```sh
-npx serve-sim --kill
+npx --yes serve-sim@0.1.49 --kill "duorex Duo"
 xcrun simctl delete "duorex Duo"
 ```
 
