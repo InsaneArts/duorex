@@ -78,6 +78,8 @@ Rex: the \"duorex\" action is in ~/.config/rex/duorex.lua. Load it from init.lua
 # counts as present when its folder exists.
 install_skill() {
   skill_note=
+  # A release from before the skill has none to give.
+  [ -f "$src/skills/duorex/SKILL.md" ] || return 0
   for agent in "$HOME/.claude" "$HOME/.codex" "$HOME/.pi/agent"; do
     [ -d "$agent" ] || continue
     if ! cmp -s "$src/skills/duorex/SKILL.md" "$agent/skills/duorex/SKILL.md"; then
