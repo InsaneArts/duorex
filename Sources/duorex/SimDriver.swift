@@ -169,7 +169,9 @@ final class SimDriver {
         // Near shut the cover is lit, and from a book on the inner screen. Between the two,
         // iOS keeps the panel it had, so either one is right there.
         if let expected = target <= 30 ? Panel.cover : target >= 125 ? .inner : nil {
-            guard await wait(seconds: 4, until: { litPanel == expected }) else { return false }
+            // Soon after a boot, SpringBoard can take half a minute to finish its first change of
+            // panel, and it holds the next change until then.
+            guard await wait(seconds: 45, until: { litPanel == expected }) else { return false }
         }
         guard litPanel != before else { return true }
         // The other panel came on. The simulator reports the new panel at once, but how the
