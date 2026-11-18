@@ -28,12 +28,13 @@ enum ScreenShot {
         guard CGImageDestinationFinalize(destination) else { throw DuoError.render("could not write \(url.path)") }
     }
 
-    /// Where a screenshot goes when the agent names no file: out of the project, so it leaves nothing behind there.
-    static func temporaryFile() -> URL {
+    /// Where a picture goes when the agent names no file: out of the project, so it leaves
+    /// nothing behind there. `kind` begins the file's name.
+    static func temporaryFile(_ kind: String) -> URL {
         let stamp = DateFormatter()
         stamp.locale = Locale(identifier: "en_US_POSIX")
         stamp.dateFormat = "HHmmss-SSS"
-        return FileManager.default.temporaryDirectory.appendingPathComponent("duorex/screen-\(stamp.string(from: Date())).png")
+        return FileManager.default.temporaryDirectory.appendingPathComponent("duorex/\(kind)-\(stamp.string(from: Date())).png")
     }
 
     /// A line at each tenth of the width and of the height, with its number at the top and at the left.

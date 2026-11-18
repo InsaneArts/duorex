@@ -41,17 +41,23 @@ extension Array {
     }
 }
 
-/// Runs one command of an agent on the simulator: it connects, does the work, and says what
-/// the work says, with how the device is after it.
+/// Runs one command of an agent on the simulator: it connects, does the work and says what
+/// the work says. The last line is always how the device is after it, so a path that the work
+/// gives stands alone on its line.
 func onSimulator(_ work: @escaping (SimDriver) async throws -> String) -> Never {
     untilDone {
         let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
         let driver = SimDriver(sim: Sim(base: address))
         _ = try await driver.connect()
-        let said = try await work(driver)
-        print("\(said)  ·  \(driver.summary)")
+        print(try await work(driver))
+        print(driver.summary)
         driver.stop()
     }
+}
+
+/// Gives the app a moment after a touch, so a screenshot that comes next is not of a button half pressed.
+func settle() async {
+    try? await Task.sleep(for: .milliseconds(450))
 }
 
 /// Opens a duorex pane beside this one, unless one is open or this is not Rex. Returns what it did, in a few words.
@@ -127,7 +133,8 @@ case "run":
         let driver = SimDriver(sim: Sim(base: address))
         _ = try await driver.connect()
         _ = await driver.settledScreen()
-        print("running  ·  \(driver.summary)")
+        print("running")
+        print(driver.summary)
         driver.stop()
     }
 case "open":
@@ -140,7 +147,7 @@ case "screenshot":
         guard let screen = driver.screen,
               let image = ScreenShot.image(of: screen, interface: driver.interface, longestSide: arguments.flag("full") ? nil : 1568, grid: arguments.flag("grid"))
         else { throw DuoError.sim("the simulator sent no picture.") }
-        let out = arguments.string("out").map { URL(fileURLWithPath: $0) } ?? arguments.words.first.map { URL(fileURLWithPath: $0) } ?? ScreenShot.temporaryFile()
+        let out = arguments.string("out").map { URL(fileURLWithPath: $0) } ?? arguments.words.first.map { URL(fileURLWithPath: $0) } ?? ScreenShot.temporaryFile("screen")
         try ScreenShot.write(image, to: out)
         return out.path
     }
@@ -148,6 +155,7 @@ case "tap":
     onSimulator { driver in
         guard let point = arguments.numbers(2), point.allSatisfy({ (0...1).contains($0) }) else { throw usage("tap X Y, each from 0 to 1 on the upright screen") }
         await driver.tap(at: CGPoint(x: point[0], y: point[1]))
+        await settle()
         return "tapped \(point[0]) \(point[1])"
     }
 case "swipe":
@@ -156,18 +164,20 @@ case "swipe":
             throw usage("swipe X1 Y1 X2 Y2 [--seconds 0.25], each from 0 to 1 on the upright screen")
         }
         await driver.swipe(from: CGPoint(x: points[0], y: points[1]), to: CGPoint(x: points[2], y: points[3]), seconds: arguments.double("seconds", default: 0.25))
+        await settle()
         return "swiped \(points[0]) \(points[1]) to \(points[2]) \(points[3])"
     }
 case "home":
     onSimulator { driver in
         await driver.swipe(from: CGPoint(x: 0.5, y: 0.985), to: CGPoint(x: 0.5, y: 0.5), seconds: 0.2)
+        await settle()
         return "went home"
     }
 case "fold":
     onSimulator { driver in
         let named = ["shut": 0.0, "closed": 0, "book": 130, "open": 180]
         guard let word = arguments.words.first, let target = named[word] ?? Double(word), (0...180).contains(target) else {
-            throw usage("fold shut|book|open, or an angle from 0 to 180")
+            throw usage("fold closed|book|open, or an angle from 0 to 180")
         }
         let start = driver.report?.hingeDegrees ?? (driver.litPanel == .cover ? 0 : 180)
         guard await driver.fold(from: start, to: target) else { throw DuoError.sim("the simulator did not fold to \(Int(target)) degrees.") }
@@ -187,6 +197,7 @@ case "press":
         let named: [String: HardwareButton] = ["power": .power, "volume-up": .volumeUp, "volume-down": .volumeDown, "camera": .cameraControl]
         guard let button = arguments.words.first.flatMap({ named[$0] }) else { throw usage("press power|volume-up|volume-down|camera") }
         await driver.press(button)
+        await settle()
         return "pressed \(button.rawValue.lowercased())"
     }
 case "strobe":
@@ -234,8 +245,10 @@ case "film":
     }
 case "sweep":
     untilDone {
+        // With no name, the sheet goes out of the project, so a sweep leaves nothing behind there.
+        let out = arguments.string("out").map { URL(fileURLWithPath: $0) } ?? ScreenShot.temporaryFile("sweep")
+        try? FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Find out now that the sheet can be saved, not after the sweep.
-        let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex-sweep.png")
         guard FileManager.default.isWritableFile(atPath: out.deletingLastPathComponent().path) else {
             throw DuoError.render("cannot write to \(out.deletingLastPathComponent().path)")
         }
@@ -286,10 +299,10 @@ default:
       duorex tap X Y                                         X and Y from 0 to 1, as in the screenshot
       duorex swipe X1 Y1 X2 Y2 [--seconds 0.25]
       duorex home
-      duorex fold shut|book|open|DEGREES
+      duorex fold closed|book|open|DEGREES
       duorex rotate upright|clockwise|upside-down|counterclockwise
       duorex press power|volume-up|volume-down|camera
-      duorex sweep [--out sheet.png]                         every posture in one picture
+      duorex sweep [--out sheet.png]                         six postures in one picture
       duorex open                                            only open the pane
 
     pictures:
