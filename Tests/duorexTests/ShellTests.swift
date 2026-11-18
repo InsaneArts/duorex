@@ -1,3 +1,5 @@
+import Foundation
+import Synchronization
 import Testing
 @testable import duorex
 
@@ -31,4 +33,27 @@ func `output larger than a pipe holds comes back whole`() async throws {
     await #expect(throws: Shell.Failure.self) {
         try await Shell.run("/nonexistent/tool", [])
     }
+}
+
+@Test(.timeLimit(.minutes(1)))
+func `a tool starts while another thread adds environment variables`() async throws {
+    // Apple's USD library adds about a hundred variables while it loads the Duo model.
+    let names = (0..<128).map { "DUOREX_TEST_\($0)" }
+    let isDone = Mutex(false)
+    let adding = Thread {
+        while !isDone.withLock({ $0 }) {
+            for name in names { setenv(name, "x", 1) }
+            for name in names { unsetenv(name) }
+            // The pause leaves the list free for the other tests, which read it too.
+            usleep(200)
+        }
+    }
+    adding.start()
+    var failures: [String] = []
+    for _ in 0..<20 {
+        do { _ = try await Shell.run("/usr/bin/true", []) } catch { failures.append("\(error)") }
+    }
+    isDone.withLock { $0 = true }
+    while !adding.isFinished { try await Task.sleep(for: .milliseconds(2)) }
+    #expect(failures == [])
 }
