@@ -2,3 +2,7 @@
 .swiftpm/
 *.xcodeproj
 .DS_Store
+
+# Pictures and movies that duorex saves in the folder it runs in.
+/duorex*.png
+/duorex*.mp4
