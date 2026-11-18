@@ -63,7 +63,10 @@ final class Sweep {
                                 interface: driver.interface, hinge: driver.report?.hingeDegrees)
                 shot.device = try? await picture(of: shot)
                 shots.append(shot)
-                progress("\(posture.name.lowercased()), held \(held.label): \(shot.panel.rawValue) screen, \(screen.width)x\(screen.height)")
+                // The size as the interface sees it, as on the sheet: a turned interface is as wide as its framebuffer is high.
+                let turned = shot.interface.quarterTurnsToUpright % 2 == 1
+                let size = turned ? "\(screen.height)x\(screen.width)" : "\(screen.width)x\(screen.height)"
+                progress("\(posture.name.lowercased()), held \(held.label): \(shot.panel.rawValue) screen, \(size)")
             }
         }
         // The way back runs in a task of its own. A cancelled sweep still folds back at a hand's pace.
