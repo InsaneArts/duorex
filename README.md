@@ -46,7 +46,7 @@ duorex sweep --out sweep.png
   <img src=".github/assets/sweep.png" width="100%" alt="A contact sheet of six postures: Settings on the cover screen, and on the inner screen as a book and open, upright and turned" />
 </p>
 
-It takes about 20 seconds and puts the simulator back the way it was. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
+It takes about 20 seconds and puts the simulator back the way it was. Without `--out`, the picture goes to a temporary folder, and the command prints its path. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
 
 ## Record a clean clip
 
@@ -108,7 +108,7 @@ duorex tap 0.46 0.57             # a point on that screenshot, each number from 
 duorex swipe 0.5 0.8 0.5 0.3
 duorex fold book                 # shut, book, open, or an angle
 duorex rotate clockwise
-duorex sweep --out sweep.png     # every posture in one picture
+duorex sweep                     # six postures in one picture
 ```
 
 When the agent touches the screen, you see where: a tap leaves a spot with a ring, and a swipe leaves a trail. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark. The marks are part of the device, so `duorex record` puts them in the movie too. When the agent folds the device, the one in your pane folds too.
