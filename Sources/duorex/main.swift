@@ -69,7 +69,7 @@ func showPane(device: String) async throws -> String {
     _ = try await RexHost.openPane(running: [binary, "--device", device] + server)
     // The pane says that it is open as soon as it starts. Wait for that, so the next command does not open another.
     for _ in 0..<40 where !Panes.isOpen(in: session) { try? await Task.sleep(for: .milliseconds(100)) }
-    return "opened a duorex pane beside this one"
+    return Panes.isOpen(in: session) ? "opened a duorex pane beside this one" : "asked Rex for a duorex pane, but duorex did not start in it"
 }
 
 /// Ends duorex with how to use a command. Arguments are checked before the simulator is asked for anything.
@@ -128,9 +128,14 @@ case "run":
             let folder = URL(fileURLWithPath: arguments.words.first ?? FileManager.default.currentDirectoryPath)
             app = try await AppRunner.build(in: folder, scheme: arguments.string("scheme"), udid: device) { print($0) }
         }
+        // Ctrl-C during the build ends the run here. It does not go on to start the app.
+        try Task.checkCancellation()
         print("starting \(app.bundleID)")
         try await AppRunner.start(app, on: device)
-        if !arguments.flag("no-pane") { print(try await showPane(device: device)) }
+        if !arguments.flag("no-pane") {
+            // The app runs. A pane that did not open is said, and is no reason to fail.
+            do { print(try await showPane(device: device)) } catch { print("could not open a duorex pane: \(error)") }
+        }
         let driver = SimDriver(sim: Sim(base: address))
         _ = try await driver.connect()
         _ = await driver.settledScreen()
