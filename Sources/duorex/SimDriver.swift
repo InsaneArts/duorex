@@ -94,21 +94,12 @@ final class SimDriver {
         }
         // A server that just started reports the hinge a moment after its first report. With
         // Xcode 27.2 it never does: serve-sim reads the hinge with a tool that Xcode no longer
-        // has, and then knows the angle only once a fold went through it. Until then it also
-        // leaves out how the device is held, so no turn can be checked. Such a server is told
-        // the angle that the lit panel shows, as `PoseSync` does for the pane.
+        // has, and then knows the angle only once a fold went through it.
         if !(await wait(seconds: 3) { report?.hingeDegrees != nil }) {
             // The simulator perhaps started with the server. A new one shows an Apple logo for one
             // or two minutes, also after Xcode calls it booted. Its picture is not worth taking,
             // and a fold sent meanwhile is acted on late.
             _ = await wait(seconds: 90) { screen.map { !Self.isBootScreen($0) } ?? false }
-            // A fold that comes too early is dropped, so it goes out until it lands.
-            let shown: Double = litPanel == .cover ? 0 : 180
-            let deadline = Date().addingTimeInterval(60)
-            while report?.hingeDegrees == nil, Date() < deadline, !Task.isCancelled {
-                sim.send(.fold(degrees: shown))
-                _ = await wait(seconds: 1) { report?.hingeDegrees != nil }
-            }
         }
         // A wait above returns at once when Ctrl-C cancels it. The command must not go on.
         try Task.checkCancellation()
@@ -191,6 +182,19 @@ final class SimDriver {
 
     /// Returns false when the simulator does not report the turn.
     func turn(to held: Orientation) async -> Bool {
+        // A server that knows no hinge also leaves out how the device is held, so no turn can be
+        // checked. It is told the angle that the lit panel shows, as `PoseSync` does for the pane.
+        // That can move the device, so only a command that turns it does this.
+        if report?.hingeDegrees == nil {
+            let shown: Double = litPanel == .cover ? 0 : 180
+            // A fold that comes too early is dropped, so it goes out until it lands.
+            let deadline = Date().addingTimeInterval(60)
+            while report?.hingeDegrees == nil, Date() < deadline, !Task.isCancelled {
+                sim.send(.fold(degrees: shown))
+                _ = await wait(seconds: 1) { report?.hingeDegrees != nil }
+            }
+        }
+        guard !Task.isCancelled else { return false }
         guard report?.duoViewOrientation != held.rawValue else { return true }
         sim.send(.rotate(held))
         guard await wait(seconds: 4, until: { report?.duoViewOrientation == held.rawValue }) else { return false }
