@@ -110,6 +110,8 @@ final class SimDriver {
                 _ = await wait(seconds: 1) { report?.hingeDegrees != nil }
             }
         }
+        // A wait above returns at once when Ctrl-C cancels it. The command must not go on.
+        try Task.checkCancellation()
         return (report?.hingeDegrees ?? (litPanel == .cover ? 0 : 180),
                 report?.duoViewOrientation.flatMap(Orientation.init(rawValue:)) ?? .portrait)
     }
