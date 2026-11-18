@@ -87,7 +87,6 @@ func mustBeWritable(_ url: URL) throws {
 
 func scene() async throws -> DuoScene {
     let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
-    scene.isWireframe = arguments.flag("wireframe")
     if arguments.flag("pattern") {
         scene.setScreen(.cover, texture: try Snapshot.testPattern(label: "COVER", width: 600, height: 1300))
         scene.setScreen(.inner, texture: try Snapshot.testPattern(label: "INNER", width: 1200, height: 1300))
@@ -310,7 +309,7 @@ case "view", "record":
     NSApplication.shared.run()
 default:
     FileHandle.standardError.write(Data("""
-    usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light] [--wireframe]
+    usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]
 
     for an agent:
       duorex run [folder] [--scheme name] [--app path.app]   build the app, start it, and open the pane

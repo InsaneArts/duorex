@@ -67,28 +67,6 @@ func `a strobe picture has the asked size and shows the half that folds above th
     #expect(lit(rows: 0..<2) == 0)
 }
 
-@MainActor @Test(.enabled("needs the Duo model in Xcode") { await hasModel() })
-func `the wireframe draws the body as lines, and the solid look comes back as it was`() async throws {
-    let scene = try await DuoScene()
-    let frame = try #require(Frame(device: scene.device, width: 320, height: 240))
-    /// How many pixels of the picture the device covers, seen from behind.
-    func covered() async throws -> Int {
-        try await scene.draw(Pose(hinge: 180, yaw: 180), into: frame)
-        let image = try #require(frame.image())
-        let data = try #require(image.dataProvider?.data as Data?)
-        // The picture is BGRA. A pixel with any alpha has some of the device on it.
-        return stride(from: 3, to: data.count, by: 4).filter { data[$0] > 200 }.count
-    }
-    let solid = try await covered()
-    scene.isWireframe = true
-    let lines = try await covered()
-    scene.isWireframe = false
-    let again = try await covered()
-    // The back of the device is one closed face. As lines, the stage shows through it.
-    #expect(lines < solid * 9 / 10)
-    #expect(again == solid)
-}
-
 @MainActor @Test(.enabled("needs the Duo model in Xcode") { await hasModel() }, .timeLimit(.minutes(1)))
 func `a film that is stopped leaves the movie that was there before, and nothing half written`() async throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("duorex-film-\(UUID().uuidString)")
