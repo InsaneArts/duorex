@@ -158,7 +158,7 @@ xcrun simctl delete "duorex Duo"
 
 ## Using it
 
-Run `duorex` in a pane. The first run creates a simulator named "duorex Duo", starts it, and starts serve-sim for it. That takes about a minute. Later runs attach to the running server.
+Run `duorex` in a pane. The first run creates a simulator named "duorex Duo", starts it, and starts serve-sim for it. That takes one to two minutes. Later runs attach to the running server.
 
 - Click or drag on a screen to touch it. Scroll to scroll.
 - Drag the frame to fold. Option-drag off the screen folds from anywhere.
