@@ -2,7 +2,7 @@
 /// two numbers of `tap 0.5 0.4`, `--name value` pairs, and flags.
 nonisolated struct Arguments {
     /// The flags that take no value. A word after one of them is a plain word.
-    private static let flags: Set<String> = ["pattern", "stage", "wireframe", "grid", "full", "no-pane"]
+    private static let flags: Set<String> = ["pattern", "stage", "grid", "full", "no-pane"]
 
     let command: String
     /// The plain words after the subcommand, in order.

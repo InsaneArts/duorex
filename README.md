@@ -87,10 +87,6 @@ duorex first takes three pictures of your app from the simulator: shut, open and
 
 The screens throw a soft light on the pane around the device, in the colours of your app. `g` turns the glow off, and duorex remembers that.
 
-## Draw it as lines
-
-`x` draws the device as a wireframe, with its screens still lit. `--wireframe` does the same for `record`, `strobe` and `film`.
-
 ## It stays in its pane
 
 duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
@@ -173,7 +169,6 @@ Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and
 - `r` rotates, `h` goes home, `q` quits.
 - `d` switches dark mode. `+` and `-` change the text size. `s` slows the animations. `w` sends a memory warning.
 - `m` turns the fold sounds off or on.
-- `x` switches between the solid device and the wireframe.
 - `g` turns the glow around the device off or on.
 - `?` shows the keys, a few at a time.
 
