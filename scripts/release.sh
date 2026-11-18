@@ -20,7 +20,7 @@ main() {
   esac
   cd "$(dirname "$0")/.."
   command -v gh >/dev/null 2>&1 || fail "the GitHub CLI is missing. Install it with: brew install gh"
-  gh auth status >/dev/null 2>&1 || fail "the GitHub CLI is not logged in. Run: gh auth login"
+  gh auth status --hostname github.com >/dev/null 2>&1 || fail "the GitHub CLI is not logged in to GitHub. Run: gh auth login"
 
   version=$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/duorex/Release.swift)
   echo "$version" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+' || fail "Release.swift has no version of the form 1.2.3."
