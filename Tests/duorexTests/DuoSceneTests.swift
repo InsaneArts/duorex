@@ -88,3 +88,14 @@ func `the wireframe draws the body as lines, and the solid look comes back as it
     #expect(lines < solid * 9 / 10)
     #expect(again == solid)
 }
+
+@MainActor @Test(.enabled("needs the Duo model in Xcode") { await hasModel() }, .timeLimit(.minutes(1)))
+func `a movie that can take no more pictures says so, and does not wait for ever`() async throws {
+    let movie = FileManager.default.temporaryDirectory.appendingPathComponent("duorex-stop-\(UUID().uuidString).mp4")
+    defer { try? FileManager.default.removeItem(at: movie) }
+    let scene = try await DuoScene()
+    let recorder = try Recorder(scene: scene, url: movie, width: 320, height: 240)
+    try await recorder.add(scene: scene, time: 0)
+    recorder.cancel()
+    await #expect(throws: DuoError.self) { try await recorder.add(scene: scene, time: 1.0 / 60) }
+}
