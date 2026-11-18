@@ -84,6 +84,11 @@ final class Recorder {
         while drawing { try? await Task.sleep(for: .milliseconds(1)) }
     }
 
+    /// A time in the movie. Sixtieths of a second are exact in it, so a film's pictures are evenly spaced.
+    nonisolated static func time(_ seconds: Double) -> CMTime {
+        CMTime(value: CMTimeValue((seconds * 60_000).rounded()), timescale: 60_000)
+    }
+
     /// Ends the movie at `time`, so it lasts as long as the recording did, and writes the file.
     /// Throws when the file could not be written, as when the disk is full.
     func finish(scene: DuoScene, time: Double) async throws {
@@ -127,7 +132,7 @@ final class Recorder {
         guard let buffer else { return }
         let device = CIImage(ioSurface: frame.surface)
         context.render(Stage.compose(device, over: stage), to: buffer, bounds: stage.extent, colorSpace: CGColorSpace(name: CGColorSpace.itur_709))
-        adaptor.append(buffer, withPresentationTime: CMTime(seconds: seconds, preferredTimescale: 600))
+        adaptor.append(buffer, withPresentationTime: Self.time(seconds))
     }
 }
 
