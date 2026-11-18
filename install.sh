@@ -32,7 +32,8 @@ main() {
   target=$(git -C "$src" rev-parse "${tag:-origin/main}^{commit}")
   if [ -x "$bin/duorex" ] && [ "$(cat "$src/../installed" 2>/dev/null)" = "$target" ]; then
     install_rex_action
-    echo "duorex $("$bin/duorex" version) is up to date.${rex_note:-}"
+    install_skill
+    echo "duorex $("$bin/duorex" version) is up to date.${rex_note:-}${skill_note:-}"
     return
   fi
 
@@ -50,8 +51,9 @@ main() {
   mv -f "$bin/duorex.new" "$bin/duorex"
   echo "$target" > "$src/../installed"
   install_rex_action
+  install_skill
 
-  echo "Installed duorex $("$bin/duorex" version) to $bin/duorex.${rex_note:-}"
+  echo "Installed duorex $("$bin/duorex" version) to $bin/duorex.${rex_note:-}${skill_note:-}"
   case ":$PATH:" in
     *":$bin:"*) ;;
     *) echo "Add $bin to your PATH to run it as \`duorex\`." ;;
@@ -70,6 +72,21 @@ Rex: the \"duorex\" action is in ~/.config/rex/duorex.lua. Load it from init.lua
   require(\"duorex\")
   rex.bind(\"ctrl+p>i\", \"duorex\")"
   fi
+}
+
+# Gives each agent on this Mac the skill that tells it how to run an app on the Duo. An agent
+# counts as present when its folder exists.
+install_skill() {
+  skill_note=
+  for agent in "$HOME/.claude" "$HOME/.codex" "$HOME/.pi/agent"; do
+    [ -d "$agent" ] || continue
+    if ! cmp -s "$src/skills/duorex/SKILL.md" "$agent/skills/duorex/SKILL.md"; then
+      mkdir -p "$agent/skills/duorex"
+      cp "$src/skills/duorex/SKILL.md" "$agent/skills/duorex/SKILL.md"
+      skill_note="$skill_note
+Skill: $agent/skills/duorex"
+    fi
+  done
 }
 
 fail() {
