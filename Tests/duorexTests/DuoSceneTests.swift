@@ -90,6 +90,25 @@ func `the wireframe draws the body as lines, and the solid look comes back as it
 }
 
 @MainActor @Test(.enabled("needs the Duo model in Xcode") { await hasModel() }, .timeLimit(.minutes(1)))
+func `a film that is stopped leaves the movie that was there before, and nothing half written`() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("duorex-film-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let movie = folder.appendingPathComponent("keep.mp4")
+    try Data("the movie from before".utf8).write(to: movie)
+    let scene = try await DuoScene()
+    let pattern = try Snapshot.testPattern(label: "X", width: 600, height: 600)
+    let filming = Task {
+        try await Film(scene: scene).write(screens: (pattern, pattern, pattern), to: movie, width: 640, height: 360) { _ in }
+    }
+    try await Task.sleep(for: .milliseconds(150))
+    filming.cancel()
+    await #expect(throws: CancellationError.self) { try await filming.value }
+    #expect(try Data(contentsOf: movie) == Data("the movie from before".utf8))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path) == ["keep.mp4"])
+}
+
+@MainActor @Test(.enabled("needs the Duo model in Xcode") { await hasModel() }, .timeLimit(.minutes(1)))
 func `a movie that can take no more pictures says so, and does not wait for ever`() async throws {
     let movie = FileManager.default.temporaryDirectory.appendingPathComponent("duorex-stop-\(UUID().uuidString).mp4")
     defer { try? FileManager.default.removeItem(at: movie) }
