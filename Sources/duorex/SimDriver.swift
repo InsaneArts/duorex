@@ -60,7 +60,7 @@ final class SimDriver {
     func swipe(from start: CGPoint, to end: CGPoint, seconds: Double) async {
         let first = interface.framebufferPoint(start), last = interface.framebufferPoint(end)
         let edge = interface.homeEdge(atFramebufferPoint: first)
-        let steps = max(Int(seconds * 60), 2)
+        let steps = max(Int((seconds.isFinite ? min(max(seconds, 0), 10) : 0.25) * 60), 2)
         await send(.touch(.begin, x: first.x, y: first.y, edge: edge))
         for step in 1...steps {
             try? await Task.sleep(for: .milliseconds(16))
