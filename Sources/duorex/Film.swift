@@ -68,19 +68,30 @@ final class Film {
     /// inner screen of the half-open one. `progress` gets the share that is done, from 0 to 1.
     func write(screens: (cover: TextureResource, open: TextureResource, book: TextureResource), to url: URL, width: Int, height: Int,
                progress: (Double) -> Void) async throws {
-        let recorder = try Recorder(scene: scene, url: url, width: width, height: height)
-        let frames = Int(FilmScript.seconds) * FilmScript.framesPerSecond
-        for index in 0..<frames {
-            try Task.checkCancellation()
-            let time = Double(index) / Double(FilmScript.framesPerSecond)
-            let shot = FilmScript.shot(at: time)
-            scene.setScreen(.cover, texture: screens.cover, brightness: shot.coverBrightness)
-            scene.setScreen(.inner, texture: shot.showsBook ? screens.book : screens.open, brightness: shot.innerBrightness)
-            scene.zoom = Float(shot.zoom)
-            scene.apply(shot.pose)
-            try await recorder.add(scene: scene, time: time)
-            if index % FilmScript.framesPerSecond == 0 { progress(Double(index) / Double(frames)) }
+        // The film is written beside its place and moved there when it is whole. So a film
+        // that is stopped leaves the movie that was there before, and nothing half written.
+        let part = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).part")
+        let recorder = try Recorder(scene: scene, url: part, width: width, height: height)
+        do {
+            let frames = Int(FilmScript.seconds) * FilmScript.framesPerSecond
+            for index in 0..<frames {
+                try Task.checkCancellation()
+                let time = Double(index) / Double(FilmScript.framesPerSecond)
+                let shot = FilmScript.shot(at: time)
+                scene.setScreen(.cover, texture: screens.cover, brightness: shot.coverBrightness)
+                scene.setScreen(.inner, texture: shot.showsBook ? screens.book : screens.open, brightness: shot.innerBrightness)
+                scene.zoom = Float(shot.zoom)
+                scene.apply(shot.pose)
+                try await recorder.add(scene: scene, time: time)
+                if index % FilmScript.framesPerSecond == 0 { progress(Double(index) / Double(frames)) }
+            }
+            try await recorder.finish(scene: scene, time: FilmScript.seconds)
+            try Recorder.makeRoom(at: url)
+            try FileManager.default.moveItem(at: part, to: url)
+        } catch {
+            recorder.cancel()
+            try? FileManager.default.removeItem(at: part)
+            throw error
         }
-        try await recorder.finish(scene: scene, time: FilmScript.seconds)
     }
 }
