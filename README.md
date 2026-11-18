@@ -102,7 +102,7 @@ duorex run                       # build the project in this folder, start the a
 duorex screenshot                # the screen, upright, as a PNG for the agent to read
 duorex tap 0.46 0.57             # a point on that screenshot, each number from 0 to 1
 duorex swipe 0.5 0.8 0.5 0.3
-duorex fold book                 # shut, book, open, or an angle
+duorex fold book                 # closed, book, open, or an angle
 duorex rotate clockwise
 duorex sweep                     # six postures in one picture
 ```
@@ -145,8 +145,8 @@ duorex update
 
 ```sh
 rm -f ~/.local/bin/duorex ~/.config/rex/duorex.lua
-rm -rf ~/.local/share/duorex ~/.claude/skills/duorex ~/.codex/skills/duorex ~/.pi/agent/skills/duorex
-defaults delete duorex 2>/dev/null   # the saved pane position
+rm -rf ~/.local/share/duorex ~/Library/Caches/duorex ~/.claude/skills/duorex ~/.codex/skills/duorex ~/.pi/agent/skills/duorex
+defaults delete duorex 2>/dev/null   # the saved pane position, sound and glow
 ```
 
 Delete the two lines from `~/.config/rex/init.lua` if you added them. serve-sim keeps running after duorex quits. To stop it and delete the simulator:
@@ -158,7 +158,7 @@ xcrun simctl delete "duorex Duo"
 
 ## Using it
 
-Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and starts serve-sim for it, which takes about 30 seconds. Later runs attach to the running server.
+Run `duorex` in a pane. The first run creates a simulator named "duorex Duo", starts it, and starts serve-sim for it. That takes about a minute. Later runs attach to the running server.
 
 - Click or drag on a screen to touch it. Scroll to scroll.
 - Drag the frame to fold. Option-drag off the screen folds from anywhere.

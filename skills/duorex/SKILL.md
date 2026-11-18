@@ -23,7 +23,7 @@ It builds the project for the Duo simulator, starts the app, and opens a duorex 
 - If you built the app yourself, give it: `duorex run --app path/to/App.app`.
 - If the build fails, the command prints the compiler's errors. Fix them and run it again.
 
-The first run on a Mac creates the simulator and takes about 30 seconds more.
+The first run on a Mac creates the simulator and takes about a minute more.
 
 ## Look
 
