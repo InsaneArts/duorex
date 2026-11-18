@@ -11,7 +11,9 @@ nonisolated struct Arguments {
 
     init(_ raw: [String]) {
         var rest = Array(raw.dropFirst())
-        command = rest.first.map { $0.hasPrefix("-") ? "view" : $0 } ?? "view"
+        // A user who asks for help gets it, whatever else is on the line.
+        let asked = ["--help": "help", "-h": "help", "--version": "version", "-v": "version"]
+        command = rest.compactMap { asked[$0] }.first ?? rest.first.map { $0.hasPrefix("-") ? "view" : $0 } ?? "view"
         if rest.first == command { rest.removeFirst() }
         var index = 0
         while index < rest.count {

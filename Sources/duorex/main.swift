@@ -94,8 +94,36 @@ func scene() async throws -> DuoScene {
     return scene
 }
 
+/// How to use duorex, for `--help` and for a command that duorex does not know.
+let usageText = """
+usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]
+
+for an agent:
+  duorex run [folder] [--scheme name] [--app path.app]   build the app, start it, and open the pane
+  duorex screenshot [file.png] [--grid] [--full]         the screen, upright
+  duorex tap X Y                                         X and Y from 0 to 1, as in the screenshot
+  duorex swipe X1 Y1 X2 Y2 [--seconds 0.25]
+  duorex home
+  duorex fold closed|book|open|DEGREES
+  duorex rotate upright|clockwise|upside-down|counterclockwise
+  duorex press power|volume-up|volume-down|camera
+  duorex sweep [--out sheet.png]                         six postures in one picture
+  duorex open                                            only open the pane
+
+pictures:
+  duorex record [--out movie.mp4] [--size 1920x1080]
+  duorex strobe [--out poster.png] [--size 2560x1440]
+  duorex film [--out film.mp4] [--size 1920x1080]
+
+  duorex update
+  duorex version
+
+"""
+
 // The run loop must own the main thread: started from inside a task, it would never drain the main queue.
 switch arguments.command {
+case "help":
+    print(usageText, terminator: "")
 case "version":
     print(Release.version)
 case "update":
@@ -308,29 +336,6 @@ case "view", "record":
     }
     NSApplication.shared.run()
 default:
-    FileHandle.standardError.write(Data("""
-    usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]
-
-    for an agent:
-      duorex run [folder] [--scheme name] [--app path.app]   build the app, start it, and open the pane
-      duorex screenshot [file.png] [--grid] [--full]         the screen, upright
-      duorex tap X Y                                         X and Y from 0 to 1, as in the screenshot
-      duorex swipe X1 Y1 X2 Y2 [--seconds 0.25]
-      duorex home
-      duorex fold closed|book|open|DEGREES
-      duorex rotate upright|clockwise|upside-down|counterclockwise
-      duorex press power|volume-up|volume-down|camera
-      duorex sweep [--out sheet.png]                         six postures in one picture
-      duorex open                                            only open the pane
-
-    pictures:
-      duorex record [--out movie.mp4] [--size 1920x1080]
-      duorex strobe [--out poster.png] [--size 2560x1440]
-      duorex film [--out film.mp4] [--size 1920x1080]
-
-      duorex update
-      duorex version
-
-    """.utf8))
+    FileHandle.standardError.write(Data(usageText.utf8))
     exit(2)
 }

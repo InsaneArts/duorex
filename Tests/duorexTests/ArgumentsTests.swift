@@ -40,3 +40,12 @@ import Testing
     #expect(Arguments(["duorex", "tap", "left", "0.4"]).numbers(2) == nil)
     #expect(Arguments(["duorex", "fold", "book"]).words == ["book"])
 }
+
+@Test func `asking for help or for the version is a command, wherever it stands`() {
+    #expect(Arguments(["duorex", "--help"]).command == "help")
+    #expect(Arguments(["duorex", "-h"]).command == "help")
+    #expect(Arguments(["duorex", "tap", "--help"]).command == "help")
+    #expect(Arguments(["duorex", "help"]).command == "help")
+    #expect(Arguments(["duorex", "--version"]).command == "version")
+    #expect(Arguments(["duorex", "-v"]).command == "version")
+}
