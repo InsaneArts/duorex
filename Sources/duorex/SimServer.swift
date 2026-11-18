@@ -49,21 +49,14 @@ enum SimServer {
     }
 
     private static func startServer(_ udid: String) async throws -> Int {
-        let arguments = ["--detach", udid, "--port", "3100"]
-        // An installed serve-sim wins. Otherwise npx fetches the release duorex was written against.
-        let output: String
-        if let installed = try? await Shell.run("/usr/bin/env", ["serve-sim"] + arguments) {
-            output = installed
-        } else {
-            let npx = try await Shell.result("/usr/bin/env", ["npx", "--yes", package] + arguments)
-            // env exits with 127 when it finds no npx on the PATH.
-            guard npx.status != 127 else { throw DuoError.sim("serve-sim needs Node.js, and npx is not on your PATH. Install Node.js, then run duorex again.") }
-            guard npx.status == 0 else { throw DuoError.sim("serve-sim did not start: \(npx.errors.suffix(300))") }
-            output = npx.output
-        }
-        guard let line = output.split(separator: "\n").last(where: { $0.hasPrefix("{") }),
+        // npx runs the release duorex was written against, also when another serve-sim is installed.
+        let npx = try await Shell.result("/usr/bin/env", ["npx", "--yes", package, "--detach", udid, "--port", "3100"])
+        // env exits with 127 when it finds no npx on the PATH.
+        guard npx.status != 127 else { throw DuoError.sim("serve-sim needs Node.js, and npx is not on your PATH. Install Node.js, then run duorex again.") }
+        guard npx.status == 0 else { throw DuoError.sim("serve-sim did not start: \(npx.errors.suffix(300))") }
+        guard let line = npx.output.split(separator: "\n").last(where: { $0.hasPrefix("{") }),
               let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
-              let port = json["port"] as? Int else { throw DuoError.sim("serve-sim did not start: \(output.suffix(300))") }
+              let port = json["port"] as? Int else { throw DuoError.sim("serve-sim did not start: \(npx.output.suffix(300))") }
         return port
     }
 }
