@@ -61,6 +61,8 @@ func showPane(device: String) async throws -> String {
     let binary = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? "duorex"
     let server = arguments.string("server").map { ["--server", $0] } ?? []
     _ = try await RexHost.openPane(running: [binary, "--device", device] + server)
+    // The pane says that it is open as soon as it starts. Wait for that, so the next command does not open another.
+    for _ in 0..<40 where !Panes.isOpen(in: session) { try? await Task.sleep(for: .milliseconds(100)) }
     return "opened a duorex pane beside this one"
 }
 
@@ -244,6 +246,8 @@ case "sweep":
         print(out.path)
     }
 case "view", "record":
+    // Before anything slow, so a command that wants a pane sees this one at once.
+    if let session = RexHost.session { Panes.opened(in: session) }
     NSApplication.shared.setActivationPolicy(.accessory)
     Task {
         do {
