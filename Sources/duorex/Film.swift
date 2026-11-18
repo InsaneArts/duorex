@@ -78,7 +78,7 @@ final class Film {
             scene.setScreen(.inner, texture: shot.showsBook ? screens.book : screens.open, brightness: shot.innerBrightness)
             scene.zoom = Float(shot.zoom)
             scene.apply(shot.pose)
-            await recorder.add(scene: scene, time: time)
+            try await recorder.add(scene: scene, time: time)
             if index % FilmScript.framesPerSecond == 0 { progress(Double(index) / Double(frames)) }
         }
         try await recorder.finish(scene: scene, time: FilmScript.seconds)
