@@ -17,7 +17,7 @@ The tests that draw the device read Apple's iPhone Duo model from your Xcode. Wi
 To see one frame without a window or a simulator:
 
 ```sh
-.build/debug/duorex snapshot --pattern --hinge 130 --out duo.png
+.build/debug/duorex snapshot --pattern --hinge 130 --out duorex-book.png
 ```
 
 The [Development](README.md#development) section of the README says which type does what.
