@@ -105,8 +105,10 @@ final class SimDriver {
         if await turn(to: .portrait) {
             for target in hinges {
                 let moved = hinge != target
-                guard await fold(from: hinge, to: target) else { break }
+                let reached = await fold(from: hinge, to: target)
+                // Reached or not, the fold went out. The way back starts from there.
                 hinge = target
+                guard reached else { break }
                 // The interface lays out again after a fold. A panel that just came on is black until the app draws on it.
                 if moved { try? await Task.sleep(for: .milliseconds(900)) }
                 _ = await wait(seconds: 5) { screen.map { !Self.isBlank($0) } ?? false }
