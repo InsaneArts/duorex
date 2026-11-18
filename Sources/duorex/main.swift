@@ -77,6 +77,14 @@ func wrongUse(_ text: String) -> Never {
     fail(DuoError.terminal("usage: duorex \(text)"))
 }
 
+/// Finds out that a picture or a movie can be saved before the simulator is moved for it.
+func mustBeWritable(_ url: URL) throws {
+    try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    guard FileManager.default.isWritableFile(atPath: url.deletingLastPathComponent().path) else {
+        throw DuoError.render("cannot write to \(url.deletingLastPathComponent().path)")
+    }
+}
+
 func scene() async throws -> DuoScene {
     let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
     scene.isWireframe = arguments.flag("wireframe")
@@ -220,6 +228,7 @@ case "strobe":
         guard size.count == 2, size.allSatisfy({ (64...8192).contains($0) }) else {
             throw DuoError.render("--size takes a width and a height, such as 2560x1440")
         }
+        try mustBeWritable(out)
         let scene = try await scene()
         if !arguments.flag("pattern") {
             // The picture shows the app as it is on the open device, on every exposure.
@@ -237,6 +246,7 @@ case "film":
         guard size.count == 2, size.allSatisfy({ (64...4096).contains($0) && $0 % 2 == 0 }) else {
             throw DuoError.render("--size takes a width and a height, both even, such as 1920x1080")
         }
+        try mustBeWritable(out)
         let scene = try await scene()
         var screens: [CGImage]
         if arguments.flag("pattern") {
@@ -260,11 +270,7 @@ case "sweep":
     untilDone {
         // With no name, the sheet goes out of the project, so a sweep leaves nothing behind there.
         let out = arguments.string("out").map { URL(fileURLWithPath: $0) } ?? ScreenShot.temporaryFile("sweep")
-        try? FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // Find out now that the sheet can be saved, not after the sweep.
-        guard FileManager.default.isWritableFile(atPath: out.deletingLastPathComponent().path) else {
-            throw DuoError.render("cannot write to \(out.deletingLastPathComponent().path)")
-        }
+        try mustBeWritable(out)
         let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
         let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
         let shots = try await Sweep(sim: Sim(base: address), scene: scene).run { print($0) }
