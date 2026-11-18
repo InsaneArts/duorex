@@ -201,6 +201,10 @@ swift test
 
 The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
 
+## Contributing
+
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) says how to build, test and release. The changes in each release are in [CHANGELOG.md](CHANGELOG.md). To report a security problem, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT License](LICENSE). Parts of the renderer are adapted from serve-sim under the Apache License 2.0; see [NOTICE](NOTICE). The iPhone Duo model belongs to Apple and is read from your Xcode, never copied.
