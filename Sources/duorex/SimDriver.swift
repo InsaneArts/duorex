@@ -99,7 +99,15 @@ final class SimDriver {
         // the angle that the lit panel shows, as `PoseSync` does for the pane.
         if !(await wait(seconds: 3) { report?.hingeDegrees != nil }) {
             let shown: Double = litPanel == .cover ? 0 : 180
-            _ = await fold(from: shown, to: shown)
+            // The simulator perhaps started with the server. While it boots it drops the fold,
+            // so the fold goes out until it lands.
+            let deadline = Date().addingTimeInterval(60)
+            while report?.hingeDegrees == nil, Date() < deadline, !Task.isCancelled {
+                sim.send(.fold(degrees: shown))
+                _ = await wait(seconds: 1) { report?.hingeDegrees != nil }
+            }
+            // A new simulator shows an Apple logo for about a minute. Its picture is not worth taking.
+            _ = await wait(seconds: 15) { screen.map { !Self.isBootScreen($0) } ?? false }
         }
         return (report?.hingeDegrees ?? (litPanel == .cover ? 0 : 180),
                 report?.duoViewOrientation.flatMap(Orientation.init(rawValue:)) ?? .portrait)
@@ -197,15 +205,22 @@ final class SimDriver {
     }
 
     /// True for a picture with nothing in it: every pixel is black.
-    private static func isBlank(_ image: CGImage) -> Bool {
+    private static func isBlank(_ image: CGImage) -> Bool { litParts(of: image) == 0 }
+
+    /// True for what a simulator shows while it boots: black, with a logo or a spinner in the
+    /// middle. An app that is as black as that passes for one, and costs a wait.
+    static func isBootScreen(_ image: CGImage) -> Bool { litParts(of: image) <= 12 }
+
+    /// How many of the picture's 576 parts, 24 each way, are not black.
+    private static func litParts(of image: CGImage) -> Int {
         let side = 24
         guard let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
-              let data = context.data else { return false }
+              let data = context.data else { return side * side }
         context.interpolationQuality = .low
         context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
         let pixels = UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: side * side * 4)
-        return !stride(from: 0, to: pixels.count, by: 4).contains { max(pixels[$0], pixels[$0 + 1], pixels[$0 + 2]) > 10 }
+        return stride(from: 0, to: pixels.count, by: 4).count { max(pixels[$0], pixels[$0 + 1], pixels[$0 + 2]) > 10 }
     }
 
     private static func image(from frame: CVPixelBuffer) -> CGImage? {
