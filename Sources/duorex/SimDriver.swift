@@ -146,9 +146,14 @@ final class SimDriver {
             sim.send(.fold(degrees: start + (target - start) * eased))
             try? await Task.sleep(for: .milliseconds(45))
         }
-        let expected = target < 90 ? Panel.cover : .inner
-        guard await wait(seconds: 4, until: { report?.hingeDegrees.map { abs($0 - target) < 10 } ?? false }),
-              await wait(seconds: 4, until: { litPanel == expected }) else { return false }
+        // When the angle before is a guess, the simulator may not be there. Tell it the angle once.
+        if start == target { sim.send(.fold(degrees: target)) }
+        guard await wait(seconds: 4, until: { report?.hingeDegrees.map { abs($0 - target) < 10 } ?? false }) else { return false }
+        // Near shut the cover is lit, and from a book on the inner screen. Between the two,
+        // iOS keeps the panel it had, so either one is right there.
+        if let expected = target <= 30 ? Panel.cover : target >= 125 ? .inner : nil {
+            guard await wait(seconds: 4, until: { litPanel == expected }) else { return false }
+        }
         guard litPanel != before else { return true }
         // The other panel came on. The simulator reports the new panel at once, but how the
         // interface is turned in it only after its next look, up to a second later.
