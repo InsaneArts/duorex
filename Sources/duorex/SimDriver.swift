@@ -12,8 +12,9 @@ final class SimDriver {
 
     init(sim: Sim) {
         self.sim = sim
-        sim.onFrame = { [unowned self] in frame = $0 }
-        sim.onReport = { [unowned self] in report = $0 }
+        // The connection can outlive this driver, and a picture can still be on its way.
+        sim.onFrame = { [weak self] in self?.frame = $0 }
+        sim.onReport = { [weak self] in self?.report = $0 }
     }
 
     /// The lit screen as the simulator drew it last, or nil before its first picture.
@@ -27,6 +28,8 @@ final class SimDriver {
     }
 
     func stop() {
+        sim.onFrame = nil
+        sim.onReport = nil
         sim.stop()
     }
 
