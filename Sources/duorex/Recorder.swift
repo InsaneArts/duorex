@@ -78,10 +78,24 @@ final class Recorder {
 
     /// Adds the scene, as it is posed now, at `time`, and returns when that picture is in the
     /// movie. It is for a film that is drawn at its own pace, not at the pace it plays.
-    func add(scene: DuoScene, time: Double) async {
-        while drawing || !input.isReadyForMoreMediaData { try? await Task.sleep(for: .milliseconds(1)) }
+    /// It throws when the movie can take no more pictures, as when the disk is full, and when the task is cancelled.
+    func add(scene: DuoScene, time: Double) async throws {
+        while drawing || !input.isReadyForMoreMediaData {
+            // A writer that stopped is never ready again.
+            guard writer.status == .writing else {
+                throw DuoError.render("could not write the movie: \(writer.error?.localizedDescription ?? "the writer stopped")")
+            }
+            try Task.checkCancellation()
+            try? await Task.sleep(for: .milliseconds(1))
+        }
         draw(scene, at: time)
         while drawing { try? await Task.sleep(for: .milliseconds(1)) }
+    }
+
+    /// Gives the movie up and deletes what was written of it.
+    func cancel() {
+        closing = true
+        if writer.status == .writing { writer.cancelWriting() }
     }
 
     /// A time in the movie. Sixtieths of a second are exact in it, so a film's pictures are evenly spaced.
