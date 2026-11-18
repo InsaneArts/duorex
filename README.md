@@ -196,8 +196,8 @@ Options:
 ```sh
 swift build
 swift test
-.build/debug/duorex snapshot --pattern --hinge 130 --out duo.png   # one frame, no window
-.build/debug/duorex snapshot --pattern --touch 0.3,0.4 --out tap.png   # the same, with a touch mark
+.build/debug/duorex snapshot --pattern --hinge 130 --out duorex-book.png   # one frame, no window
+.build/debug/duorex snapshot --pattern --touch 0.3,0.4 --out duorex-tap.png   # the same, with a touch mark
 ```
 
 The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
