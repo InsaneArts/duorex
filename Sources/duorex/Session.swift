@@ -29,8 +29,7 @@ final class Session {
     private var hint: String {
         [stage.recorder == nil ? "drag frame to fold  ·  1 2 3 poses  ·  ? keys  ·  q quit" : "● recording  ·  ? keys  ·  q stops and saves",
          "r rotate  ·  h home  ·  d dark  ·  + - text  ·  ? more",
-         "s slow  ·  w memory warning  ·  m sound  ·  ? more",
-         "x wireframe  ·  g glow  ·  ? back"][hintLine]
+         "s slow  ·  w memory  ·  m sound  ·  g glow  ·  ? back"][hintLine]
     }
     private var hintLine = 0
     /// A word about the key that was just pressed. It gives way to the usual line after a moment.
@@ -247,7 +246,7 @@ final class Session {
                 sim?.send(.rotate(held))
             case "?":
                 let shown = status == hint
-                hintLine = (hintLine + 1) % 4
+                hintLine = (hintLine + 1) % 3
                 if shown { show(hint) }
             case "d":
                 change { "\(try await SimSettings.toggleAppearance(of: $0)) appearance" }
@@ -268,10 +267,6 @@ final class Session {
             case "g":
                 stage.glows.toggle()
                 tell(stage.glows ? "glow on" : "glow off")
-            case "x":
-                stage.scene.isWireframe.toggle()
-                stage.setNeedsRender()
-                tell(stage.scene.isWireframe ? "wireframe" : "solid")
             default: break
             }
         case .resized:
