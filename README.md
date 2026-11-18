@@ -123,7 +123,7 @@ The installer builds duorex from source and puts it in `~/.local/bin`.
 
 Requirements:
 
-- A Mac with Apple silicon, on macOS 15 or newer
+- A Mac with Apple silicon, on macOS 26.6 or newer
 - Xcode 27.1 or newer, with an iOS 27.1 or newer simulator runtime
 - Node.js, for serve-sim
 - Rex, or another terminal that reports the pointer in pixels, such as Ghostty

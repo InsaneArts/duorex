@@ -4,7 +4,7 @@ Bug reports and pull requests are welcome. For a larger change, open an issue fi
 
 ## Build and test
 
-You need a Mac with Apple silicon, macOS 15 or newer, and Xcode 27.1 or newer.
+You need a Mac with Apple silicon, macOS 26.6 or newer, and Xcode 27.1 or newer.
 
 ```sh
 swift build
