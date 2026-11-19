@@ -1,4 +1,5 @@
 import Foundation
+import SimHostKit
 
 /// Finds, makes and starts the simulator that duorex shows.
 enum Simulators {
@@ -9,6 +10,9 @@ enum Simulators {
     /// uses its own, and makes it the first time.
     static func booted(_ device: String?) async throws -> String {
         let udid = try await udid(for: device ?? defaultDevice, create: device == nil)
+        // Asking CoreSimulator here is quicker than simctl, and loads the frameworks that the
+        // screens need anyway.
+        if (try? Simulator(udid: udid))?.isBooted == true { return udid }
         // bootstatus with -b starts a simulator that is shut down, and returns once it is booted.
         let boot = try await Shell.result("/usr/bin/xcrun", ["simctl", "bootstatus", udid, "-b"])
         guard boot.status == 0 else { throw DuoError.sim("the simulator did not start: \(boot.errors.suffix(300))") }
