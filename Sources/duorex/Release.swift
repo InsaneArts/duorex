@@ -18,7 +18,7 @@ enum Release {
         guard FileManager.default.isReadableFile(atPath: installer) else {
             FileHandle.standardError.write(Data("""
             duorex was not installed with install.sh, so it cannot update itself. Install it with:
-              curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
+              curl -fsSL https://raw.githubusercontent.com/InsaneArts/duorex/main/install.sh | sh
 
             """.utf8))
             exit(1)

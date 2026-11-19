@@ -19,7 +19,7 @@ duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. Y
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/InsaneArts/duorex/main/install.sh | sh
 ```
 
 The installer builds duorex from source and puts it in `~/.local/bin`. Then run `duorex` in a empty pane

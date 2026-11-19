@@ -2,7 +2,7 @@
 
 ## Report a vulnerability
 
-Do not open a public issue for a security problem. Use **Report a vulnerability** on the [Security tab](https://github.com/tornikegomareli/duorex/security) of this repository. Only the maintainer sees the report.
+Do not open a public issue for a security problem. Use **Report a vulnerability** on the [Security tab](https://github.com/InsaneArts/duorex/security) of this repository. Only the maintainer sees the report.
 
 Say what the problem is, how to reproduce it, and which version you run (`duorex version`).
 

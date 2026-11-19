@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs or updates duorex. It builds the newest release from source and puts it on your PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/InsaneArts/duorex/main/install.sh | sh
 #
 # Run it again, or run `duorex update`, to update.
 set -eu
@@ -9,7 +9,7 @@ set -eu
 # The whole script is one function, so the shell reads it all before it runs any of it.
 # That keeps a half-downloaded script, or one replaced by its own update, from running.
 main() {
-  repo="${DUOREX_REPO:-https://github.com/tornikegomareli/duorex.git}"
+  repo="${DUOREX_REPO:-https://github.com/InsaneArts/duorex.git}"
   src="${DUOREX_SRC:-$HOME/.local/share/duorex/src}"
   bin="${DUOREX_BIN:-$HOME/.local/bin}"
 
