@@ -109,10 +109,11 @@ final class SimDriver {
         }
         // A host that just started reports the hinge once its helper in the simulator is running,
         // most of a second after its first report.
-        if !(await wait(seconds: 3) { report?.hingeDegrees != nil }) {
-            // The simulator perhaps started with the host. A new one shows an Apple logo for one
-            // or two minutes, also after Xcode calls it booted. Its picture is not worth taking,
-            // and a fold sent meanwhile is acted on late.
+        _ = await wait(seconds: 3) { report?.hingeDegrees != nil }
+        // A simulator that started a moment ago shows an Apple logo for one or two minutes, also
+        // after Xcode calls it booted. Its picture is not worth taking, and a fold sent meanwhile
+        // is acted on late.
+        if let booted = sim.bootedAt, Date().timeIntervalSince(booted) < 180 {
             _ = await wait(seconds: 90) { screen.map { !Self.isBootScreen($0) } ?? false }
         }
         // A wait above returns at once when Ctrl-C cancels it. The command must not go on.
