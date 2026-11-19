@@ -1,7 +1,7 @@
 import CoreGraphics
 
 /// One of the four quarter turns. It names how the user holds the device, and how the interface
-/// is turned inside a panel's framebuffer. The raw values are serve-sim's names.
+/// is turned inside a panel's framebuffer. The raw values are the simulator's names for them, in snake case.
 nonisolated enum Orientation: String, CaseIterable {
     case portrait
     case landscapeLeft = "landscape_left"

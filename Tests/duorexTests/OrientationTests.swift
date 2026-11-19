@@ -10,7 +10,7 @@ func `interface and framebuffer points map back and forth`(orientation: Orientat
     #expect(abs(back.x - point.x) < 1e-9 && abs(back.y - point.y) < 1e-9)
 }
 
-@Test func `the interface is turned inside the framebuffer as serve-sim turns it`() {
+@Test func `the interface is turned inside the framebuffer as the simulator turns it`() {
     let point = CGPoint(x: 0.2, y: 0.7)
     #expect(Orientation.portrait.framebufferPoint(point) == CGPoint(x: 0.2, y: 0.7))
     #expect(Orientation.landscapeLeft.framebufferPoint(point) == CGPoint(x: 0.7, y: 0.8))
@@ -37,7 +37,7 @@ func `a touch at the bottom of the interface is the swipe home`(orientation: Ori
     #expect(rolls == [-90, -180, 90, 0])
 }
 
-@Test func `serve-sim's names decode`() {
+@Test func `the simulator's names decode`() {
     #expect(Orientation(rawValue: "landscape_left") == .landscapeLeft)
     #expect(Orientation(rawValue: "portrait_upside_down") == .upsideDown)
     #expect(Orientation(rawValue: "sideways") == nil)
