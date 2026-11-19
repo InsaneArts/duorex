@@ -39,6 +39,8 @@ The installer builds duorex from source and puts it in `~/.local/bin`. Then run 
 > - The device stays on screen when you switch tabs.
 > - After you split or resize panes, move the pointer over the duorex pane once, so the device finds it again.
 > - The key to open the device is for Rex only.
+>
+> If you want duorex to support other terminals or other simulators, I'm happy to get your pull requests. [CONTRIBUTING.md](CONTRIBUTING.md) says how to build and test it.
 
 ### Open it with a keybind
 
