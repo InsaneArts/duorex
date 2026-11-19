@@ -235,6 +235,8 @@ Options:
 - Folding and touches on the inner screen use private Xcode interfaces through serve-sim, so an Xcode update can break them. duorex pins the serve-sim release it was written against.
 - Outside Rex, the device does not hide when you switch tabs, because other terminals do not report their layout.
 
+Most of these limits come from serve-sim. I am considering writing serve-sim's part from scratch, so that duorex can fix many of them in the near future.
+
 ## Development
 
 ```sh
