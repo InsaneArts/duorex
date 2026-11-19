@@ -15,14 +15,14 @@
   <a href="#remove">Remove</a>
 </p>
 
-duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. You fold it and control the it from your keyboard, your agent can use it, run on it and test anything inside duorex
+duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. You fold it and control it from your keyboard, your agent can use it, run on it and test anything inside duorex
 ## Install
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/InsaneArts/duorex/main/install.sh | sh
 ```
 
-The installer builds duorex from source and puts it in `~/.local/bin`. Then run `duorex` in a empty pane
+The installer builds duorex from source and puts it in `~/.local/bin`. Then run `duorex` in an empty pane
 
 ### Requirements
 
