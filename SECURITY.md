@@ -13,7 +13,7 @@ Only the newest release gets fixes. Run `duorex update` to get it.
 ## What duorex does on your Mac
 
 - It runs as you, with no extra rights. It never asks for a password.
-- It starts [serve-sim](https://github.com/EvanBacon/serve-sim) 0.1.49, which controls the simulator. The first time, `npx` downloads serve-sim from npm.
-- serve-sim listens on `127.0.0.1` only, so other computers cannot reach it. Other programs on your Mac can.
-- The installer and `duorex update` get the source from this repository and build it on your Mac.
-- Apart from these two downloads, duorex uses the network only to talk to serve-sim on your Mac.
+- It controls the simulator through [simhost](https://github.com/InsaneArts/simhost). simhost loads Xcode's private simulator frameworks, and runs a helper inside the simulator that it builds with your Xcode and keeps in `~/Library/Caches/simhost`.
+- The simulator's host is a process of duorex. It listens on a Unix socket in your temporary folder, which only your user can open. Any program that runs as you can.
+- The installer and `duorex update` get the source of duorex and of simhost from GitHub, and build it on your Mac.
+- Apart from that, duorex does not use the network.

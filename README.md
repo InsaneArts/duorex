@@ -28,7 +28,6 @@ The installer builds duorex from source and puts it in `~/.local/bin`. Then run 
 
 - A Mac with Apple silicon, on macOS 26.6 or newer
 - Xcode 27.1 or newer, with an iOS 27.1 or newer simulator runtime
-- Node.js, for serve-sim
 - Rex, or another terminal that reports the pointer in pixels, such as Ghostty
 
 > [!WARNING]
@@ -106,16 +105,17 @@ duorex run                       # build the project in this folder, start the a
 duorex screenshot                # the screen, upright, as a PNG for the agent to read
 duorex tap 0.46 0.57             # a point on that screenshot, each number from 0 to 1
 duorex swipe 0.5 0.8 0.5 0.3
+duorex type "hello@example.com"  # into the field that has focus
 duorex fold book                 # closed, book, open, or an angle
 duorex rotate clockwise
 duorex sweep                     # six postures in one picture
 ```
 
-When the agent touches the screen, you see where: a tap leaves a spot with a ring, and a swipe leaves a trail. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark. The marks are part of the device, so `duorex record` puts them in the movie too. When the agent folds the device, the one in your pane folds too.
+When the agent touches the screen, you see where: a tap leaves a spot with a ring, and a swipe draws a trail as the finger moves. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark. The marks are part of the device, so `duorex record` puts them in the movie too. When the agent folds the device, the one in your pane folds too.
 
 The installer gives Claude Code, Codex and pi a skill named `duorex`. It tells them these commands and when to use them, so "run it on the Duo" is enough.
 
-duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve-sim). A tool that drives the simulator through serve-sim shows in the pane the same way.
+duorex runs the simulator through [simhost](https://github.com/InsaneArts/simhost). A tool that drives the simulator through simhost shows in the pane the same way.
 
 ### Test the settings with one key
 
@@ -204,16 +204,16 @@ rm -rf ~/.local/share/duorex ~/Library/Caches/duorex ~/.claude/skills/duorex ~/.
 defaults delete duorex 2>/dev/null   # the saved pane position, sound and glow
 ```
 
-Delete the two lines from `~/.config/rex/init.lua` if you added them. serve-sim keeps running after duorex quits. To stop it and delete the simulator:
+Delete the two lines from `~/.config/rex/init.lua` if you added them. To delete the simulator and the helper that duorex builds for it:
 
 ```sh
-npx --yes serve-sim@0.1.49 --kill "duorex Duo"
 xcrun simctl delete "duorex Duo"
+rm -rf ~/Library/Caches/simhost
 ```
 
 ## Using it
 
-Run `duorex` in a pane. The first run creates a simulator named "duorex Duo", starts it, and starts serve-sim for it. That takes one to three minutes. Later runs attach to the running server.
+Run `duorex` in a pane. The first run creates a simulator named "duorex Duo" and starts it. That takes one to three minutes. Later runs use the simulator that runs.
 
 - Click or drag on a screen to touch it. Scroll to scroll.
 - Drag the frame to fold. Option-drag off the screen folds from anywhere.
@@ -232,21 +232,16 @@ The first time duorex runs in a terminal, move the pointer over the pane once. T
 Options:
 
 - `--device <name|udid>` uses another iPhone Duo simulator.
-- `--server <url>` attaches to a serve-sim that is already running, such as `http://127.0.0.1:3100`.
 - `--finish Light` shows the light model. The default is `Dark`.
 
 ## Limits
 
 - The camera control press goes to the simulator, but iOS showed no reaction to it in our tests.
-- duorex shows the touches that reach the simulator through serve-sim. A tool that touches it another way leaves no mark.
-- serve-sim reports a swipe when the finger first moves and when it comes up, so the trail is drawn after the swipe.
-- serve-sim follows one touch at a time. When you and an agent touch at the same moment, the agent's mark can be cut short.
-- Typing does not reach the simulator. With Xcode 27, serve-sim can type only through Device Hub.
-- With Xcode 27.2, serve-sim cannot read the hinge angle. duorex shows the angle it last asked for, or `hinge unknown` until something folds the device after serve-sim starts.
-- Folding and touches on the inner screen use private Xcode interfaces through serve-sim, so an Xcode update can break them. duorex pins the serve-sim release it was written against.
+- duorex shows the touches that reach the simulator through simhost. A tool that touches it another way leaves no mark.
+- You cannot type into the app from the pane yet. An agent can, with `duorex type`, in printable ASCII on a US layout.
+- When you and an agent touch the same screen at the same moment, simhost sends both fingers as one two-finger touch. This has not been tested.
+- The screens, touches, folds and typing use private Xcode interfaces through simhost, so an Xcode update can break them. duorex pins the simhost revision it was written against.
 - Outside Rex, the device does not hide when you switch tabs, because other terminals do not report their layout.
-
-Most of these limits come from serve-sim. I am considering writing serve-sim's part from scratch, so that duorex can fix many of them in the near future.
 
 ## Development
 
@@ -257,7 +252,7 @@ swift test
 .build/debug/duorex snapshot --pattern --touch 0.3,0.4 --out duorex-tap.png   # the same, with a touch mark
 ```
 
-The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Sim` and `ScreenFeed` bring the simulator's screen to it, in the wire format `SimWire` knows, and `PoseSync` decides whether the device or the simulator moved first. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
+The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Simulators` finds and starts the simulator. `Sim` reads its screens and sends input through [simhost](https://github.com/InsaneArts/simhost), `SimWire` puts simhost's messages in duorex's terms, and `ScreenFeed` puts the screens on the device. `PoseSync` decides whether the device or the simulator moved first. duorex starts the simulator's host as `duorex host <udid>` when none runs. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
 
 ## Contributing
 
