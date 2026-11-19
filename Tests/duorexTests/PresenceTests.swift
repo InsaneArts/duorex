@@ -19,38 +19,45 @@ private let there = CGPoint(x: 0.8, y: 0.2)
     #expect(presence.step(to: 10.5).isEmpty)
 }
 
-@Test func `a finger that is down shows as one spot until it comes up`() {
+@Test func `a finger that is down and has not moved shows as one spot`() {
     var presence = Presence()
-    presence.saw(.drag(from: here, to: CGPoint(x: 0.32, y: 0.58), ended: false), time: 10)
-    #expect(presence.step(to: 13) == [Mark(point: CGPoint(x: 0.32, y: 0.58), radius: 0.045, opacity: 0.95)])
-    presence.saw(.drag(from: here, to: there, ended: true), time: 13.5)
-    #expect(presence.step(to: 13.5).first?.point == here)
-    #expect(presence.step(to: 15).isEmpty)
+    presence.saw(.drag(from: here, to: here, ended: false), time: 10)
+    #expect(presence.step(to: 13) == [Mark(point: here, radius: 0.045, opacity: 0.95)])
 }
 
-@Test func `a swipe is drawn from its start to its end, then a ring spreads where it ended`() {
+@Test func `a finger that moves is drawn where it is now, with its trail behind it`() {
     var presence = Presence()
-    presence.saw(.drag(from: here, to: there, ended: true), time: 10)
-    // On the way: a trail behind the finger, and no ring yet.
-    let onTheWay = presence.step(to: 10.1)
-    #expect(onTheWay.count > 3)
-    #expect(onTheWay.allSatisfy { $0.look == .spot })
-    #expect(onTheWay.first?.point == here)
-    let finger = onTheWay.last!
-    #expect(finger.point.x > here.x && finger.point.x < there.x)
+    presence.saw(.drag(from: here, to: here, ended: false), time: 10)
+    presence.saw(.drag(from: here, to: there, ended: false), time: 10.2)
+    let moving = presence.step(to: 10.2)
+    #expect(moving.count > 3)
+    #expect(moving.allSatisfy { $0.look == .spot })
+    #expect(moving.first?.point == here)
+    #expect(moving.last == Mark(point: there, radius: 0.045, opacity: 0.95))
     // The trail gets larger toward the finger.
-    #expect(onTheWay.dropLast().map(\.radius) == onTheWay.dropLast().map(\.radius).sorted())
-    // Arrived: the finger's spot is at the end, with the ring.
-    let arrived = presence.step(to: 10.3)
-    #expect(arrived.last == Mark(point: there, radius: arrived.last!.radius, opacity: arrived.last!.opacity, look: .ring))
-    #expect(arrived.dropLast().last?.point == there)
-    #expect(presence.step(to: 10.71).isEmpty)
+    #expect(moving.dropLast().map(\.radius) == moving.dropLast().map(\.radius).sorted())
+}
+
+@Test func `a swipe that ends keeps its trail, and a ring spreads where it ended`() {
+    var presence = Presence()
+    presence.saw(.drag(from: here, to: here, ended: false), time: 10)
+    presence.saw(.drag(from: here, to: there, ended: true), time: 10.3)
+    // At once: the whole trail, the finger's spot at the end, and the ring. Nothing is drawn again.
+    let ended = presence.step(to: 10.3)
+    #expect(ended.first?.point == here)
+    #expect(ended.last == Mark(point: there, radius: ended.last!.radius, opacity: ended.last!.opacity, look: .ring))
+    #expect(ended.dropLast().last?.point == there)
+    // The trail fades as the ring spreads.
+    let later = presence.step(to: 10.6)
+    #expect(later[0].opacity < ended[0].opacity)
+    #expect(later.last!.radius > ended.last!.radius)
+    #expect(presence.step(to: 10.8).isEmpty)
 }
 
 @Test func `a finger whose end was lost goes away by itself`() {
     var presence = Presence()
     presence.saw(.drag(from: here, to: there, ended: false), time: 10)
-    #expect(presence.step(to: 17.9).count == 1)
+    #expect(!presence.step(to: 17.9).isEmpty)
     #expect(presence.step(to: 18).isEmpty)
     #expect(presence.current(at: 18) == nil)
 }
@@ -92,10 +99,9 @@ private let there = CGPoint(x: 0.8, y: 0.2)
 }
 
 @Test func `a new touch means the finger before it is up`() {
-    // The server follows one finger for a device, and does not always tell that it came up.
+    // The device shows one other finger at a time, as when a second agent touches.
     var presence = Presence()
     presence.saw(.drag(from: here, to: CGPoint(x: 0.3, y: 0.62), ended: false), time: 10)
-    // The finger went back to where it began, so the server tells a tap and never ends the drag.
     presence.saw(.tap(here), time: 10.5)
     #expect(presence.step(to: 10.6).map(\.point) == [here, here])
     #expect(presence.step(to: 11).isEmpty)
