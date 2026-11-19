@@ -49,7 +49,10 @@ duorex tap 0.62 0.35
 duorex swipe 0.5 0.8 0.5 0.3     # a finger moves from the first point to the second
 duorex home
 duorex press power               # power, volume-up, volume-down, camera
+duorex type "hello@example.com"  # into the field that has focus; tap the field first
 ```
+
+`type` takes printable ASCII, as on a US keyboard. A line break in the text is the return key.
 
 ## Fold and turn
 

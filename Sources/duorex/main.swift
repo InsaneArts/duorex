@@ -102,6 +102,7 @@ for an agent:
   duorex screenshot [file.png] [--grid] [--full]         the screen, upright
   duorex tap X Y                                         X and Y from 0 to 1, as in the screenshot
   duorex swipe X1 Y1 X2 Y2 [--seconds 0.25]
+  duorex type TEXT                                       types into the app, as on a US keyboard
   duorex home
   duorex fold closed|book|open|DEGREES
   duorex rotate upright|clockwise|upside-down|counterclockwise
@@ -210,6 +211,17 @@ case "swipe":
         await driver.swipe(from: CGPoint(x: points[0], y: points[1]), to: CGPoint(x: points[2], y: points[3]), seconds: seconds)
         await settle()
         return "swiped \(points[0]) \(points[1]) to \(points[2]) \(points[3])"
+    }
+case "type":
+    let text = arguments.words.joined(separator: " ")
+    // The keyboard inside the simulator is a US one. It has no key for any other character.
+    guard !text.isEmpty, text.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) || $0 == "\n" }) else {
+        wrongUse("type TEXT, in printable ASCII. A line break is the return key")
+    }
+    onSimulator { driver in
+        await driver.type(text)
+        await settle()
+        return "typed \(text.count) characters"
     }
 case "home":
     onSimulator { driver in

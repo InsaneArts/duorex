@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreVideo
+import QuartzCore
 import Foundation
 import VideoToolbox
 
@@ -8,12 +9,17 @@ import VideoToolbox
 final class SimDriver {
     private let sim: Sim
     private var frame: CVPixelBuffer?
+    /// When the newest picture came, in `CACurrentMediaTime` seconds.
+    private var frameTime = 0.0
     private(set) var report: SimWire.Report?
 
     init(sim: Sim) {
         self.sim = sim
         // The connection can outlive this driver, and a picture can still be on its way.
-        sim.onFrame = { [weak self] in self?.frame = $0 }
+        sim.onFrame = { [weak self] in
+            self?.frame = $0
+            self?.frameTime = CACurrentMediaTime()
+        }
         sim.onReport = { [weak self] in self?.report = $0 }
     }
 
@@ -68,6 +74,15 @@ final class SimDriver {
             await send(.touch(.move, x: first.x + (last.x - first.x) * share, y: first.y + (last.y - first.y) * share, edge: edge))
         }
         await send(.touch(.end, x: last.x, y: last.y, edge: edge))
+    }
+
+    /// Types into the app that has focus, as on a US keyboard. A line break is the return key.
+    /// Returns once the app has taken the keys: the screen changes with each key, and then stops.
+    func type(_ text: String) async {
+        await send(.type(text))
+        try? await Task.sleep(for: .milliseconds(150))
+        // A blinking caret changes the screen only twice a second.
+        _ = await wait(seconds: 10) { CACurrentMediaTime() - frameTime > 0.4 }
     }
 
     /// Presses a hardware button and lets it go.

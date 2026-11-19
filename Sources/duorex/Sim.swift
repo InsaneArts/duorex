@@ -134,6 +134,8 @@ final class Sim {
             .orientation(SimHostKit.Orientation(orientation))
         case .button(let button, let pressed):
             .button(page: UInt32(button.usage.page), usage: UInt32(button.usage.usage), down: pressed)
+        case .type(let text):
+            .type(text)
         case .slowAnimations(let slow):
             .slowAnimations(slow)
         case .memoryWarning:
