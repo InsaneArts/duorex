@@ -3,7 +3,7 @@
 <h3 align="center">A real iPhone Duo in your terminal pane.</h3>
 
 <p align="center">
-  <img src=".github/assets/hero.webp" width="100%" alt="Rex split in two: Claude Code on the left, and on the right a 3D iPhone Duo turning all the way round in the duorex pane" />
+  <img src=".github/assets/hero.avif" width="100%" alt="Rex split in two: Claude Code on the left, and on the right a 3D iPhone Duo turning all the way round in the duorex pane" />
 </p>
 
 <p align="center">
@@ -52,7 +52,7 @@ duorex update
 ### Fold it like the real thing
 
 <p align="center">
-  <img src=".github/assets/fold.webp" width="100%" alt="The pointer drags the edge of the iPhone Duo and the device folds under it, opens flat again, then folds to a book with the 2 key" />
+  <img src=".github/assets/fold.avif" width="100%" alt="The pointer drags the edge of the iPhone Duo and the device folds under it, opens flat again, then folds to a book with the 2 key" />
 </p>
 
 Drag the frame and the device folds under your pointer. The simulator's hinge follows, so your app lays out again as the angle changes. Let go and it stays at that angle. Close to shut or to flat, it finishes the move.
@@ -64,7 +64,7 @@ The device makes a sound when it shuts and when it opens flat, louder for a fast
 ### Touch what you see
 
 <p align="center">
-  <img src=".github/assets/touch.webp" width="100%" alt="Clicks on the Duo's screen open the Packs tab and a booster, a drag across the top of the pack tears it open, and the cards come out" />
+  <img src=".github/assets/touch.avif" width="100%" alt="Clicks on the Duo's screen open the Packs tab and a booster, a drag across the top of the pack tears it open, and the cards come out" />
 </p>
 
 Click, drag and scroll on either screen. The touch lands where you point, on a flat screen and on a bent one. `r` turns the device a quarter turn, and `h` swipes home.
@@ -76,7 +76,7 @@ Drag the background to turn the device. A long drag turns it all the way round, 
 ### Press its buttons
 
 <p align="center">
-  <img src=".github/assets/buttons.webp" width="100%" alt="The pointer rests on a volume button and the line under the device names it. Presses show the volume bar, then the power button brings up the lock screen" />
+  <img src=".github/assets/buttons.avif" width="100%" alt="The pointer rests on a volume button and the line under the device names it. Presses show the volume bar, then the power button brings up the lock screen" />
 </p>
 
 The power, volume and camera control buttons on the frame are real. Click one and it goes into the frame, and the simulator gets the press: the volume changes, the screen locks. Hold it and the simulator sees it held.
@@ -86,7 +86,7 @@ The buttons are small, so rest the pointer on one and the pane names it. On a cl
 ### Your agent runs your app on it
 
 <p align="center">
-  <img src=".github/assets/agent.webp" width="100%" alt="Claude Code in the left Rex pane opens a pack in the app on the Duo in the right pane, then turns the device and folds it like a laptop" />
+  <img src=".github/assets/agent.avif" width="100%" alt="Claude Code in the left Rex pane opens a pack in the app on the Duo in the right pane, then turns the device and folds it like a laptop" />
 </p>
 
 duorex is where your agent tries its work, not only a simulator to look at. Tell your agent in Rex to run the app on the Duo. It runs `duorex run`, which builds the Xcode project, starts the app on the Duo, and opens the duorex pane beside the agent's pane. Then the agent uses the app, and you watch.
@@ -110,7 +110,7 @@ duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve
 ### Test the settings with one key
 
 <p align="center">
-  <img src=".github/assets/keys.webp" width="100%" alt="The d key switches the Photos app between dark and light, and + and - change the text size. The line under the device names each change" />
+  <img src=".github/assets/keys.avif" width="100%" alt="The d key switches the Photos app between dark and light, and + and - change the text size. The line under the device names each change" />
 </p>
 
 `d` switches between the light and the dark appearance. `+` and `-` change the text size. `s` makes every animation slow, and `w` sends a memory warning. The line under the device says what changed.
@@ -132,7 +132,7 @@ It takes about 20 seconds and puts the simulator back the way it was. Without `-
 ### It stays in its pane
 
 <p align="center">
-  <img src=".github/assets/pane.webp" width="100%" alt="The duorex pane zooms to fill the Rex window and back, and the device follows the pane" />
+  <img src=".github/assets/pane.avif" width="100%" alt="The duorex pane zooms to fill the Rex window and back, and the device follows the pane" />
 </p>
 
 duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
@@ -174,7 +174,7 @@ The picture shows the app as it is on the open device. If the simulator is shut,
 ### Make a film
 
 <p align="center">
-  <img src=".github/assets/film.webp" width="100%" alt="A film made by duorex film: the device turns while shut, opens as it comes round to the front, and the camera moves in on the app" />
+  <img src=".github/assets/film.avif" width="100%" alt="A film made by duorex film: the device turns while shut, opens as it comes round to the front, and the camera moves in on the app" />
 </p>
 
 `duorex film` makes a ten-second movie with no hand on the device. It turns while it is shut, opens as it comes round to the front, the camera moves in on your app, and it folds to a book.
