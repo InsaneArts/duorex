@@ -1,72 +1,101 @@
-import CoreMedia
+import CoreVideo
 import Foundation
+import IOSurface
 import QuartzCore
-import VideoToolbox
+import SimHostKit
 
-/// One simulator served by serve-sim: its live screen, its input, and what its other clients do.
-/// The bytes on the connections are `SimWire`'s; this type owns the connections and the decoder.
-final class Sim: NSObject, URLSessionDataDelegate {
-    /// A decoded picture of the lit panel.
+/// One simulator, through simhost: its live screen, its input, and what its other clients do.
+///
+/// The pictures come straight from the simulator's framebuffers, with no copy and no video.
+/// Input goes to the simulator's host, one process that every client of the simulator shares.
+/// The host passes on what the other clients do, and tells the device's state.
+final class Sim {
+    /// A picture of the lit panel. It is the simulator's live framebuffer: copy it at once.
     var onFrame: ((CVPixelBuffer) -> Void)?
     /// The simulator's pose changed, or it reported it for the first time.
     var onReport: ((SimWire.Report) -> Void)?
-    /// Another client of the server did something to the simulator. Most of the time it is an agent.
+    /// Another client of the simulator did something to it. Most of the time it is an agent.
     var onActivity: ((SimWire.Activity) -> Void)?
 
     /// The simulator's identifier.
-    var device: String { base.lastPathComponent }
+    let device: String
 
-    private let base: URL
-    private var session: URLSession!
-    private var streamTask: URLSessionDataTask?
-    private var socket: URLSessionWebSocketTask?
-    private var stream = SimWire.Stream()
-    private var eventsTask: URLSessionDataTask?
-    private var events = SimWire.Events()
-    private var sent = SimWire.Sent()
-    private var format: CMVideoFormatDescription?
-    private var decoder: VTDecompressionSession?
+    private var screens: Screens?
+    private var host: HostClient?
+    private let mailbox = Mailbox()
+    private var isDuo = false
+    private var state: Wire.State?
+    /// The newest picture of each panel, and how its interface is turned.
+    private var latest: [SimHostKit.Panel: SimHostKit.Frame] = [:]
+    /// A wrapper for each framebuffer, made once. A framebuffer is replaced only when the simulator restarts.
+    private var buffers: [IOSurfaceID: CVPixelBuffer] = [:]
+    private var activities = SimWire.Activities()
     private var stopped = false
     private var pendingHinge: Double?
     private var hingeTimer: Timer?
 
-    /// `base` is the device's address on the server, such as http://127.0.0.1:3100/helper/<udid>.
-    init(base: URL) {
-        self.base = base
-        super.init()
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
-        // Everything arrives on the main queue: the work per picture is a copy and a decode call.
-        session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
+    init(udid: String) {
+        device = udid
     }
 
+    /// Connects to the simulator, and again whenever the connection ends.
     func start() {
-        openStream()
-        openSocket()
-        openEvents()
+        guard !stopped else { return }
+        let device = device
+        let launch = [Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? CommandLine.arguments[0], "host", device]
+        let mailbox = mailbox
+        // Loading Xcode's frameworks, and starting a host that is not running, take a moment.
+        Task.detached { [weak self] in
+            do {
+                let simulator = try Simulator(udid: device)
+                // Before anything arrives: what arrives is read by whether this is a Duo.
+                await MainActor.run { self?.isDuo = simulator.isDuo }
+                let host = try HostClient(udid: device, name: "duorex", launch: launch, onMessage: { message in
+                    DispatchQueue.main.async { MainActor.assumeIsolated { self?.received(message) } }
+                }, onClose: {
+                    DispatchQueue.main.async { MainActor.assumeIsolated { self?.lost() } }
+                })
+                let screens = try Screens(simulator: simulator) { frame in
+                    if mailbox.put(frame) { DispatchQueue.main.async { MainActor.assumeIsolated { self?.drain() } } }
+                }
+                await MainActor.run {
+                    guard let self, !self.stopped else { host.close(); screens.stop(); return }
+                    self.host = host
+                    self.screens = screens
+                }
+            } catch {
+                log.error("simulator: \(String(describing: error), privacy: .public)")
+                try? await Task.sleep(for: .seconds(1))
+                await self?.start()
+            }
+        }
     }
 
     func stop() {
         stopped = true
-        streamTask?.cancel()
-        eventsTask?.cancel()
-        socket?.cancel(with: .goingAway, reason: nil)
-        if let decoder { VTDecompressionSessionInvalidate(decoder) }
+        host?.close()
+        screens?.stop()
+        hingeTimer?.invalidate()
+    }
+
+    /// The host went away, as when the simulator restarts. A new connection starts a new host.
+    private func lost() {
+        host?.close()
+        screens?.stop()
+        host = nil
+        screens = nil
+        latest = [:]
+        buffers = [:]
+        guard !stopped else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.start() }
     }
 
     // MARK: Input
 
     /// `sent` runs when the message is out, or at once when there is no connection to send it on.
     func send(_ message: SimWire.Message, sent done: (@MainActor @Sendable () -> Void)? = nil) {
-        sent.note(message, time: CACurrentMediaTime())
-        guard let socket else {
-            if let done { Task { @MainActor in done() } }
-            return
-        }
-        socket.send(.data(message.data)) { error in
-            if let error { log.error("input: \(error.localizedDescription, privacy: .public)") }
-            if let done { Task { @MainActor in done() } }
-        }
+        host?.send(input(for: message))
+        if let done { Task { @MainActor in done() } }
     }
 
     /// Moves the simulator's hinge. Angles are spaced 50 ms apart, so a fold sends a smooth sweep, not a flood.
@@ -93,131 +122,134 @@ final class Sim: NSObject, URLSessionDataDelegate {
         send(.fold(degrees: degrees))
     }
 
-    // MARK: Connections
-
-    private func openSocket() {
-        guard !stopped, var components = URLComponents(url: base.appendingPathComponent("ws"), resolvingAgainstBaseURL: false) else { return }
-        components.scheme = "ws"
-        let socket = session.webSocketTask(with: components.url!)
-        self.socket = socket
-        socket.resume()
-        receive(on: socket)
-    }
-
-    private func receive(on socket: URLSessionWebSocketTask) {
-        socket.receive { [weak self] result in
-            MainActor.assumeIsolated {
-                guard let self, self.socket === socket else { return }
-                switch result {
-                case .success(.data(let message)):
-                    if let report = SimWire.report(from: message) { self.onReport?(report) }
-                    self.receive(on: socket)
-                case .success:
-                    self.receive(on: socket)
-                case .failure:
-                    self.retry { $0.openSocket() }
-                }
-            }
+    private func input(for message: SimWire.Message) -> Wire.Input {
+        switch message {
+        case .touch(let phase, let x, let y, let edge):
+            .touch(Self.phase(phase), x: Float(x), y: Float(y), screen: litScreen, edge: UInt8(edge ?? 0))
+        case .pinch(let phase, let first, let second):
+            .pinch(Self.phase(phase), x1: Float(first.x), y1: Float(first.y), x2: Float(second.x), y2: Float(second.y), screen: litScreen)
+        case .fold(let degrees):
+            .fold(degrees: degrees, milliseconds: 0)
+        case .rotate(let orientation):
+            .orientation(SimHostKit.Orientation(orientation))
+        case .button(let button, let pressed):
+            .button(page: UInt32(button.usage.page), usage: UInt32(button.usage.usage), down: pressed)
+        case .slowAnimations(let slow):
+            .slowAnimations(slow)
+        case .memoryWarning:
+            .memoryWarning
         }
     }
 
-    private func openStream() {
-        guard !stopped else { return }
-        stream = SimWire.Stream()
-        var request = URLRequest(url: base.appendingPathComponent("stream.avcc"))
-        request.timeoutInterval = 3600 * 24
-        streamTask = session.dataTask(with: request)
-        streamTask?.resume()
-    }
-
-    /// The event log is the server's, not the device's: it is at the server's root, and names the device.
-    private func openEvents() {
-        guard !stopped, var components = URLComponents(url: base.deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("api/event-log/events"), resolvingAgainstBaseURL: false) else { return }
-        // The stream starts with the events of the past. One is the fewest the server sends.
-        components.queryItems = [URLQueryItem(name: "device", value: base.lastPathComponent), URLQueryItem(name: "limit", value: "1")]
-        events = SimWire.Events()
-        var request = URLRequest(url: components.url!)
-        request.timeoutInterval = 3600 * 24
-        eventsTask = session.dataTask(with: request)
-        eventsTask?.resume()
-    }
-
-    /// Opens a dropped connection again after a pause, as when the simulator restarts.
-    private func retry(_ open: @escaping @MainActor (Sim) -> Void) {
-        guard !stopped else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-            if let self { open(self) }
+    private static func phase(_ phase: DeviceMotion.TouchPhase) -> Wire.Phase {
+        switch phase {
+        case .begin: .down
+        case .move: .move
+        case .end: .up
         }
     }
 
-    nonisolated func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        MainActor.assumeIsolated {
-            if dataTask === eventsTask {
-                let now = CACurrentMediaTime()
-                for activity in events.read(data) where !sent.claims(activity, time: now) { onActivity?(activity) }
-                return
-            }
-            guard dataTask === streamTask else { return }
-            for record in stream.read(data) {
-                switch record {
-                case .format(let sps, let pps): makeDecoder(sps: sps, pps: pps)
-                case .picture(let sample): decode(sample)
-                }
-            }
-            // The completion handler opens a fresh stream.
-            if stream.isOutOfStep { dataTask.cancel() }
+    // MARK: What the simulator tells
+
+    /// The panel that shows the interface. Until SpringBoard tells it, the hinge decides, as it
+    /// does on the device most of the time.
+    private var litScreen: Wire.Screen {
+        guard isDuo else { return .main }
+        if let lit = state?.lit { return lit }
+        return (state?.hinge ?? 0) < 90 ? .duoCover : .duoInner
+    }
+
+    private var litPanel: SimHostKit.Panel {
+        switch litScreen {
+        case .duoCover: .duoCover
+        case .duoInner: .duoInner
+        case .main: latest.keys.first ?? .duoCover
         }
     }
 
-    nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
-        MainActor.assumeIsolated {
-            if task === eventsTask {
-                // A server without an event log never gets one. Any other end is a dropped connection.
-                if (task.response as? HTTPURLResponse)?.statusCode != 404 { retry { $0.openEvents() } }
-            } else if task === streamTask {
-                retry { $0.openStream() }
-            }
+    private func received(_ message: Wire.Message) {
+        switch message {
+        case .state(let new):
+            let lit = litPanel
+            state = new
+            report()
+            // A panel that lights up may have no new picture for a while. Show the one it has.
+            if litPanel != lit, let frame = latest[litPanel] { show(frame) }
+        case .event(let client, _, _, let input):
+            if let activity = activities.read(input, from: client) { onActivity?(activity) }
+        default:
+            break
         }
     }
 
-    // MARK: Decoding
-
-    private func makeDecoder(sps: Data, pps: Data) {
-        var format: CMVideoFormatDescription?
-        sps.withUnsafeBytes { spsBytes in
-            pps.withUnsafeBytes { ppsBytes in
-                let sets = [spsBytes.bindMemory(to: UInt8.self).baseAddress!, ppsBytes.bindMemory(to: UInt8.self).baseAddress!]
-                _ = CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: nil, parameterSetCount: 2, parameterSetPointers: sets,
-                                                                        parameterSetSizes: [sps.count, pps.count], nalUnitHeaderLength: 4,
-                                                                        formatDescriptionOut: &format)
-            }
+    private func drain() {
+        for frame in mailbox.take() {
+            let turned = latest[frame.panel]?.orientation != frame.orientation
+            latest[frame.panel] = frame
+            guard frame.panel == litPanel else { continue }
+            if turned { report() }
+            show(frame)
         }
-        guard let format else { return }
-        if let decoder { VTDecompressionSessionInvalidate(decoder) }
-        decoder = nil
-        self.format = format
-        let output: [CFString: Any] = [kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA, kCVPixelBufferMetalCompatibilityKey: true]
-        VTDecompressionSessionCreate(allocator: nil, formatDescription: format, decoderSpecification: nil,
-                                     imageBufferAttributes: output as CFDictionary, outputCallback: nil, decompressionSessionOut: &decoder)
     }
 
-    private func decode(_ sample: Data) {
-        guard let decoder, let format, !sample.isEmpty else { return }
-        var block: CMBlockBuffer?
-        CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: sample.count, blockAllocator: nil, customBlockSource: nil,
-                                           offsetToData: 0, dataLength: sample.count, flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block)
-        guard let block else { return }
-        sample.withUnsafeBytes { _ = CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0, dataLength: sample.count) }
-        var buffer: CMSampleBuffer?
-        var size = sample.count
-        CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1, sampleTimingEntryCount: 0,
-                                  sampleTimingArray: nil, sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &buffer)
-        guard let buffer else { return }
-        VTDecompressionSessionDecodeFrame(decoder, sampleBuffer: buffer, flags: [._EnableAsynchronousDecompression], infoFlagsOut: nil) { [weak self] _, _, image, _, _ in
-            guard let image else { return }
-            nonisolated(unsafe) let frame = image
-            DispatchQueue.main.async { self?.onFrame?(frame) }
+    private func show(_ frame: SimHostKit.Frame) {
+        let id = IOSurfaceGetID(frame.surface)
+        if buffers[id] == nil {
+            var buffer: Unmanaged<CVPixelBuffer>?
+            CVPixelBufferCreateWithIOSurface(nil, frame.surface, nil, &buffer)
+            buffers[id] = buffer?.takeRetainedValue()
+        }
+        if let buffer = buffers[id] { onFrame?(buffer) }
+    }
+
+    private func report() {
+        guard let state else { return }
+        let interface = latest[litPanel].map { Orientation($0.orientation) } ?? .portrait
+        onReport?(SimWire.Report(width: litPanel.width, orientation: interface.rawValue, hingeDegrees: state.hinge,
+                                 duoViewOrientation: isDuo ? Orientation(state.held).rawValue : nil))
+    }
+}
+
+/// The newest picture of each panel, from the screens' queue to the main thread. While the main
+/// thread is busy, newer pictures replace older ones, so it never falls behind the simulator.
+private nonisolated final class Mailbox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var frames: [SimHostKit.Panel: SimHostKit.Frame] = [:]
+
+    /// Returns true when the main thread must be told: the box was empty.
+    func put(_ frame: SimHostKit.Frame) -> Bool {
+        lock.withLock {
+            defer { frames[frame.panel] = frame }
+            return frames.isEmpty
+        }
+    }
+
+    func take() -> [SimHostKit.Frame] {
+        lock.withLock {
+            defer { frames = [:] }
+            return Array(frames.values)
+        }
+    }
+}
+
+nonisolated extension Orientation {
+    init(_ orientation: SimHostKit.Orientation) {
+        switch orientation {
+        case .portrait: self = .portrait
+        case .upsideDown: self = .upsideDown
+        case .landscapeLeft: self = .landscapeLeft
+        case .landscapeRight: self = .landscapeRight
+        }
+    }
+}
+
+nonisolated extension SimHostKit.Orientation {
+    init(_ orientation: Orientation) {
+        switch orientation {
+        case .portrait: self = .portrait
+        case .upsideDown: self = .upsideDown
+        case .landscapeLeft: self = .landscapeLeft
+        case .landscapeRight: self = .landscapeRight
         }
     }
 }
