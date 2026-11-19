@@ -3,12 +3,57 @@
 <h3 align="center">A real iPhone Duo in your terminal pane.</h3>
 
 <p align="center">
-  <img src=".github/assets/hero.png" width="100%" alt="An iPhone Duo folded like a book, with the Photos app open across both halves of its inner screen" />
+  <img src=".github/assets/hero.webp" width="100%" alt="Rex split in two: Claude Code on the left, and on the right a 3D iPhone Duo turning all the way round in the duorex pane" />
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#your-agent-runs-your-app-on-it">Your agent</a> ·
+  <a href="#using-it">Keys</a> ·
+  <a href="#limits">Limits</a> ·
+  <a href="#remove">Remove</a>
 </p>
 
 duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. The device is Apple's own model from Xcode, and its screens are the live simulator. You fold it with your pointer, and your agent can use the same device while you watch.
 
-## Fold it like the real thing
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
+```
+
+The installer builds duorex from source and puts it in `~/.local/bin`. Then run `duorex` in a Rex pane.
+
+### Requirements
+
+- A Mac with Apple silicon, on macOS 26.6 or newer
+- Xcode 27.1 or newer, with an iOS 27.1 or newer simulator runtime
+- Node.js, for serve-sim
+- Rex, or another terminal that reports the pointer in pixels, such as Ghostty
+
+### Open it with a key
+
+To open the device with a key in Rex, load the action from `~/.config/rex/init.lua`. The installer puts it in `~/.config/rex/duorex.lua`:
+
+```lua
+require("duorex")
+rex.bind("ctrl+p>i", "duorex")
+```
+
+### Update
+
+```sh
+duorex update
+```
+
+## Features
+
+### Fold it like the real thing
+
+<p align="center">
+  <img src=".github/assets/fold.webp" width="100%" alt="The pointer drags the edge of the iPhone Duo and the device folds under it, opens flat again, then folds to a book with the 2 key" />
+</p>
 
 Drag the frame and the device folds under your pointer. The simulator's hinge follows, so your app lays out again as the angle changes. Let go and it stays at that angle. Close to shut or to flat, it finishes the move.
 
@@ -16,7 +61,11 @@ Drag the frame and the device folds under your pointer. The simulator's hinge fo
 
 The device makes a sound when it shuts and when it opens flat, louder for a fast fold. `m` turns the sound off.
 
-## Touch what you see
+### Touch what you see
+
+<p align="center">
+  <img src=".github/assets/touch.webp" width="100%" alt="Clicks on the Duo's screen open the Packs tab and a booster, a drag across the top of the pack tears it open, and the cards come out" />
+</p>
 
 Click, drag and scroll on either screen. The touch lands where you point, on a flat screen and on a bent one. `r` turns the device a quarter turn, and `h` swipes home.
 
@@ -24,76 +73,21 @@ Hold Option and drag on a screen to pinch. The pointer is one finger, and the ot
 
 Drag the background to turn the device. A long drag turns it all the way round, so you see its back. It comes back to the front when you let go.
 
-## Press its buttons
+### Press its buttons
+
+<p align="center">
+  <img src=".github/assets/buttons.webp" width="100%" alt="The pointer rests on a volume button and the line under the device names it. Presses show the volume bar, then the power button brings up the lock screen" />
+</p>
 
 The power, volume and camera control buttons on the frame are real. Click one and it goes into the frame, and the simulator gets the press: the volume changes, the screen locks. Hold it and the simulator sees it held.
 
 The buttons are small, so rest the pointer on one and the pane names it. On a closed device the front half covers them, and they still work where the pane names them.
 
-## Test the settings with one key
-
-`d` switches between the light and the dark appearance. `+` and `-` change the text size. `s` makes every animation slow, and `w` sends a memory warning. The line under the device says what changed.
-
-## See every posture at once
-
-`duorex sweep` folds the simulator through closed, book and open, held upright and turned, and saves one picture of them all. Each cell shows the screen the right way up, the device in that posture, and the size your app got.
-
-```sh
-duorex sweep --out sweep.png
-```
+### Your agent runs your app on it
 
 <p align="center">
-  <img src=".github/assets/sweep.png" width="100%" alt="A contact sheet of six postures: Settings on the cover screen, and on the inner screen as a book and open, upright and turned" />
+  <img src=".github/assets/agent.webp" width="100%" alt="Claude Code in the left Rex pane opens a pack in the app on the Duo in the right pane, then turns the device and folds it like a laptop" />
 </p>
-
-It takes about 20 seconds and puts the simulator back the way it was. Without `--out`, the picture goes to a temporary folder, and the command prints its path. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
-
-## Record a clean clip
-
-`duorex record` shows the device as usual and records everything you do with it, until you press `q`. The movie shows the device alone on a dark stage, lit by its own screens, at 1920 by 1080 and up to 60 frames a second. The picture at the top of this page is a frame from one.
-
-```sh
-duorex record                                   # saves to ~/Movies/duorex-<time>.mp4
-duorex record --out demo.mp4 --size 1080x1080
-```
-
-## Make a poster
-
-`duorex strobe` saves one still picture of the device as it folds, like a strobe photo. The half that lies still shows your app, and the other half shows at seven angles, from flat to upright.
-
-```sh
-duorex strobe                                    # saves duorex-strobe.png, 2560 by 1440
-duorex strobe --out poster.png --size 3840x2160
-```
-
-<p align="center">
-  <img src=".github/assets/strobe.png" width="100%" alt="An iPhone Duo on a dark stage. One half lies flat with Settings on it, and the other half stands upright, with fainter pictures of it at five angles on its way up" />
-</p>
-
-The picture shows the app as it is on the open device. If the simulator is shut, duorex opens it for the picture and puts it back.
-
-## Make a film
-
-`duorex film` makes a ten-second movie with no hand on the device. It turns while it is shut, opens as it comes round to the front, the camera moves in on your app, and it folds to a book.
-
-```sh
-duorex film                                    # saves duorex-film.mp4, 1920 by 1080
-duorex film --out launch.mp4 --size 1080x1080
-```
-
-duorex first takes three pictures of your app from the simulator: shut, open and half open. Then it draws the film at its own pace, so each of its 600 pictures is in the movie. The whole run takes about 20 seconds, and the simulator is put back.
-
-## It lights its pane
-
-The screens throw a soft light on the pane around the device, in the colours of your app. `g` turns the glow off, and duorex remembers that.
-
-## It stays in its pane
-
-duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
-
-Move the Rex window or change the layout and the device follows. Switch to another tab and it hides.
-
-## Your agent runs your app on it
 
 duorex is where your agent tries its work, not only a simulator to look at. Tell your agent in Rex to run the app on the Duo. It runs `duorex run`, which builds the Xcode project, starts the app on the Duo, and opens the duorex pane beside the agent's pane. Then the agent uses the app, and you watch.
 
@@ -113,33 +107,84 @@ The installer gives Claude Code, Codex and pi a skill named `duorex`. It tells t
 
 duorex runs the simulator through [serve-sim](https://github.com/EvanBacon/serve-sim). A tool that drives the simulator through serve-sim shows in the pane the same way.
 
-## Install
+### Test the settings with one key
+
+<p align="center">
+  <img src=".github/assets/keys.webp" width="100%" alt="The d key switches the Photos app between dark and light, and + and - change the text size. The line under the device names each change" />
+</p>
+
+`d` switches between the light and the dark appearance. `+` and `-` change the text size. `s` makes every animation slow, and `w` sends a memory warning. The line under the device says what changed.
+
+### See every posture at once
+
+`duorex sweep` folds the simulator through closed, book and open, held upright and turned, and saves one picture of them all. Each cell shows the screen the right way up, the device in that posture, and the size your app got.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
+duorex sweep --out sweep.png
 ```
 
-The installer builds duorex from source and puts it in `~/.local/bin`.
+<p align="center">
+  <img src=".github/assets/sweep.png" width="100%" alt="A contact sheet of six postures: Settings on the cover screen, and on the inner screen as a book and open, upright and turned" />
+</p>
 
-Requirements:
+It takes about 20 seconds and puts the simulator back the way it was. Without `--out`, the picture goes to a temporary folder, and the command prints its path. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
 
-- A Mac with Apple silicon, on macOS 26.6 or newer
-- Xcode 27.1 or newer, with an iOS 27.1 or newer simulator runtime
-- Node.js, for serve-sim
-- Rex, or another terminal that reports the pointer in pixels, such as Ghostty
+### It stays in its pane
 
-To open the device with a key in Rex, load the action from `~/.config/rex/init.lua`. The installer puts it in `~/.config/rex/duorex.lua`:
+<p align="center">
+  <img src=".github/assets/pane.webp" width="100%" alt="The duorex pane zooms to fill the Rex window and back, and the device follows the pane" />
+</p>
 
-```lua
-require("duorex")
-rex.bind("ctrl+p>i", "duorex")
-```
+duorex runs in the pane as a terminal program and draws the device in a window over it. Rex keeps the pointer and the keyboard, so the pane focuses, splits and closes like any other.
 
-To update:
+Move the Rex window or change the layout and the device follows. Switch to another tab and it hides.
+
+### It lights its pane
+
+The screens throw a soft light on the pane around the device, in the colours of your app. `g` turns the glow off, and duorex remembers that.
+
+### Record a clean clip
+
+`duorex record` shows the device as usual and records everything you do with it, until you press `q`. The movie shows the device alone on a dark stage, lit by its own screens, at 1920 by 1080 and up to 60 frames a second. This is a frame from one.
+
+<p align="center">
+  <img src=".github/assets/record.png" width="100%" alt="An iPhone Duo folded like a book, with the Photos app open across both halves of its inner screen" />
+</p>
 
 ```sh
-duorex update
+duorex record                                   # saves to ~/Movies/duorex-<time>.mp4
+duorex record --out demo.mp4 --size 1080x1080
 ```
+
+### Make a poster
+
+`duorex strobe` saves one still picture of the device as it folds, like a strobe photo. The half that lies still shows your app, and the other half shows at seven angles, from flat to upright.
+
+```sh
+duorex strobe                                    # saves duorex-strobe.png, 2560 by 1440
+duorex strobe --out poster.png --size 3840x2160
+```
+
+<p align="center">
+  <img src=".github/assets/strobe.png" width="100%" alt="An iPhone Duo on a dark stage. One half lies flat with Settings on it, and the other half stands upright, with fainter pictures of it at five angles on its way up" />
+</p>
+
+The picture shows the app as it is on the open device. If the simulator is shut, duorex opens it for the picture and puts it back.
+
+### Make a film
+
+<p align="center">
+  <img src=".github/assets/film.webp" width="100%" alt="A film made by duorex film: the device turns while shut, opens as it comes round to the front, and the camera moves in on the app" />
+</p>
+
+`duorex film` makes a ten-second movie with no hand on the device. It turns while it is shut, opens as it comes round to the front, the camera moves in on your app, and it folds to a book.
+
+```sh
+duorex film                                    # saves duorex-film.mp4, 1920 by 1080
+duorex film --out launch.mp4 --size 1080x1080
+```
+
+duorex first takes three pictures of your app from the simulator: shut, open and half open. Then it draws the film at its own pace, so each of its 600 pictures is in the movie. The whole run takes about 20 seconds, and the simulator is put back.
 
 ## Remove
 
