@@ -31,6 +31,15 @@ The installer builds duorex from source and puts it in `~/.local/bin`. Then run 
 - Node.js, for serve-sim
 - Rex, or another terminal that reports the pointer in pixels, such as Ghostty
 
+> [!WARNING]
+> duorex is made for Rex. Ghostty is the only other terminal it has been tested in. Other terminals that report the pointer in pixels may work, but they are untested. Terminal.app does not report the pointer in pixels, so duorex does not work there.
+>
+> Outside Rex:
+> - `duorex run` cannot open the duorex pane beside your agent. Run `duorex` in a pane yourself.
+> - The device stays on screen when you switch tabs.
+> - After you split or resize panes, move the pointer over the duorex pane once, so the device finds it again.
+> - The key to open the device is for Rex only.
+
 ### Open it with a keybind
 
 To open the device with a key in Rex, load the action from `~/.config/rex/init.lua`. The installer puts it in `~/.config/rex/duorex.lua`:
