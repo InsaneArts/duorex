@@ -19,6 +19,8 @@ final class Sim {
 
     /// The simulator's identifier.
     let device: String
+    /// When the simulator last started, once connected.
+    private(set) var bootedAt: Date?
 
     private var screens: Screens?
     private var host: HostClient?
@@ -49,7 +51,10 @@ final class Sim {
             do {
                 let simulator = try Simulator(udid: device)
                 // Before anything arrives: what arrives is read by whether this is a Duo.
-                await MainActor.run { self?.isDuo = simulator.isDuo }
+                await MainActor.run {
+                    self?.isDuo = simulator.isDuo
+                    self?.bootedAt = simulator.bootedAt
+                }
                 let host = try HostClient(udid: device, name: "duorex", launch: launch, onMessage: { message in
                     DispatchQueue.main.async { MainActor.assumeIsolated { self?.received(message) } }
                 }, onClose: {
