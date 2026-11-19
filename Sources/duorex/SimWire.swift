@@ -42,6 +42,8 @@ nonisolated enum SimWire {
         case pinch(DeviceMotion.TouchPhase, CGPoint, CGPoint)
         /// A hardware button going down or coming up.
         case button(HardwareButton, pressed: Bool)
+        /// Text to type into the app that has focus, as on a US keyboard. A line break is the return key.
+        case type(String)
         /// Makes every animation on the simulator slow, or normal again.
         case slowAnimations(Bool)
         /// Tells the apps on the simulator that memory is low.
