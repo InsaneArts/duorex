@@ -1,6 +1,6 @@
-<h1 align="center">duorex</h1>
+<h1 align="center">duorex  </h1>
 
-<h3 align="center">A real iPhone Duo in your terminal pane.</h3>
+<h3 align="center">A 3D iPhone Duo in your Rex pane</h3>
 
 <p align="center">
   <img src=".github/assets/hero.avif" width="100%" alt="Rex split in two: Claude Code on the left, and on the right a 3D iPhone Duo turning all the way round in the duorex pane" />
@@ -15,15 +15,14 @@
   <a href="#remove">Remove</a>
 </p>
 
-duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. The device is Apple's own model from Xcode, and its screens are the live simulator. You fold it with your pointer, and your agent can use the same device while you watch.
-
+duorex puts a 3D iPhone Duo in a [Rex](https://www.superlogical.com/rex) pane. You fold it and control the it from your keyboard, your agent can use it, run on it and test anything inside duorex
 ## Install
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/tornikegomareli/duorex/main/install.sh | sh
 ```
 
-The installer builds duorex from source and puts it in `~/.local/bin`. Then run `duorex` in a Rex pane.
+The installer builds duorex from source and puts it in `~/.local/bin`. Then run `duorex` in a empty pane
 
 ### Requirements
 
@@ -32,7 +31,7 @@ The installer builds duorex from source and puts it in `~/.local/bin`. Then run 
 - Node.js, for serve-sim
 - Rex, or another terminal that reports the pointer in pixels, such as Ghostty
 
-### Open it with a key
+### Open it with a keybind
 
 To open the device with a key in Rex, load the action from `~/.config/rex/init.lua`. The installer puts it in `~/.config/rex/duorex.lua`:
 
