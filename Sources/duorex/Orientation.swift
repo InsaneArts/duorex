@@ -44,7 +44,7 @@ nonisolated enum Orientation: String, CaseIterable {
         }
     }
 
-    /// The framebuffer edge under the interface's bottom edge, as serve-sim numbers edges:
+    /// The framebuffer edge under the interface's bottom edge, as SimulatorKit numbers edges:
     /// 1 left, 2 top, 3 bottom, 4 right.
     private var bottomEdge: Int {
         switch self {
@@ -55,7 +55,7 @@ nonisolated enum Orientation: String, CaseIterable {
         }
     }
 
-    /// A touch that starts in the bottom 7% of the interface is the swipe home. serve-sim wants
+    /// A touch that starts in the bottom 7% of the interface is the swipe home. SimulatorKit wants
     /// that touch tagged with the framebuffer edge it starts from. Nil for any other touch.
     func homeEdge(atFramebufferPoint point: CGPoint) -> Int? {
         interfacePoint(point).y >= 0.93 ? bottomEdge : nil

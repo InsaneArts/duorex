@@ -92,11 +92,10 @@ final class SimDriver {
             try Task.checkCancellation()
             throw DuoError.sim("the simulator sent no picture. Is it booted?")
         }
-        // A server that just started reports the hinge a moment after its first report. With
-        // Xcode 27.2 it never does: serve-sim reads the hinge with a tool that Xcode no longer
-        // has, and then knows the angle only once a fold went through it.
+        // A host that just started reports the hinge once its helper in the simulator is running,
+        // most of a second after its first report.
         if !(await wait(seconds: 3) { report?.hingeDegrees != nil }) {
-            // The simulator perhaps started with the server. A new one shows an Apple logo for one
+            // The simulator perhaps started with the host. A new one shows an Apple logo for one
             // or two minutes, also after Xcode calls it booted. Its picture is not worth taking,
             // and a fold sent meanwhile is acted on late.
             _ = await wait(seconds: 90) { screen.map { !Self.isBootScreen($0) } ?? false }
@@ -182,8 +181,8 @@ final class SimDriver {
 
     /// Returns false when the simulator does not report the turn.
     func turn(to held: Orientation) async -> Bool {
-        // A server that knows no hinge also leaves out how the device is held, so no turn can be
-        // checked. It is told the angle that the lit panel shows, as `PoseSync` does for the pane.
+        // A host that knows no hinge, because its helper did not start, cannot check a turn.
+        // It is told the angle that the lit panel shows, as `PoseSync` does for the pane.
         // That can move the device, so only a command that turns it does this.
         if report?.hingeDegrees == nil {
             let shown: Double = litPanel == .cover ? 0 : 180
@@ -232,9 +231,18 @@ final class SimDriver {
         return stride(from: 0, to: pixels.count, by: 4).count { max(pixels[$0], pixels[$0 + 1], pixels[$0 + 2]) > 10 }
     }
 
+    /// A picture of the frame that stays as it is. The frame is the simulator's live framebuffer,
+    /// so an image that shared its memory would change as the simulator draws.
     private static func image(from frame: CVPixelBuffer) -> CGImage? {
+        CVPixelBufferLockBaseAddress(frame, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(frame, .readOnly) }
         var image: CGImage?
         VTCreateCGImageFromCVPixelBuffer(frame, options: nil, imageOut: &image)
-        return image
+        guard let image, let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                                 space: image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()
     }
 }

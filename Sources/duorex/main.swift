@@ -1,5 +1,6 @@
 import AppKit
 import RealityKit
+import SimHostKit
 
 let arguments = Arguments(CommandLine.arguments)
 var session: Session?
@@ -46,8 +47,7 @@ extension Array {
 /// gives stands alone on its line.
 func onSimulator(_ work: @escaping (SimDriver) async throws -> String) -> Never {
     untilDone {
-        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-        let driver = SimDriver(sim: Sim(base: address))
+        let driver = SimDriver(sim: Sim(udid: try await Simulators.booted(arguments.string("device"))))
         _ = try await driver.connect()
         print(try await work(driver))
         print(driver.summary)
@@ -65,8 +65,7 @@ func showPane(device: String) async throws -> String {
     guard let session = RexHost.session else { return "this is not a Rex pane. Run duorex in a pane to watch." }
     guard !Panes.isOpen(in: session) else { return "the duorex pane is open" }
     let binary = Bundle.main.executableURL?.resolvingSymlinksInPath().path ?? "duorex"
-    let server = arguments.string("server").map { ["--server", $0] } ?? []
-    _ = try await RexHost.openPane(running: [binary, "--device", device] + server)
+    _ = try await RexHost.openPane(running: [binary, "--device", device])
     // The pane says that it is open as soon as it starts. Wait for that, so the next command does not open another.
     for _ in 0..<40 where !Panes.isOpen(in: session) { try? await Task.sleep(for: .milliseconds(100)) }
     return Panes.isOpen(in: session) ? "opened a duorex pane beside this one" : "asked Rex for a duorex pane, but duorex did not start in it"
@@ -96,7 +95,7 @@ func scene() async throws -> DuoScene {
 
 /// How to use duorex, for `--help` and for a command that duorex does not know.
 let usageText = """
-usage: duorex [view] [--device name|udid] [--server url] [--finish Dark|Light]
+usage: duorex [view] [--device name|udid] [--finish Dark|Light]
 
 for an agent:
   duorex run [folder] [--scheme name] [--app path.app]   build the app, start it, and open the pane
@@ -126,6 +125,11 @@ case "help":
     print(usageText, terminator: "")
 case "version":
     print(Release.version)
+case "host":
+    // The one process that owns a simulator's input. duorex starts it when none runs, and every
+    // client of the simulator shares it. It exits ten minutes after its last client leaves.
+    guard let udid = arguments.words.first else { fail(DuoError.sim("host needs a simulator's UDID")) }
+    do { try Host(simulator: Simulator(udid: udid)).run() } catch { fail(error) }
 case "update":
     Release.update()
 case "snapshot":
@@ -154,8 +158,7 @@ case "snapshot":
     dispatchMain()
 case "run":
     untilDone {
-        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-        let device = address.lastPathComponent
+        let device = try await Simulators.booted(arguments.string("device"))
         let app: AppRunner.App
         if let path = arguments.string("app") {
             app = try AppRunner.app(at: path)
@@ -171,7 +174,7 @@ case "run":
             // The app runs. A pane that did not open is said, and is no reason to fail.
             do { print(try await showPane(device: device)) } catch { print("could not open a duorex pane: \(error)") }
         }
-        let driver = SimDriver(sim: Sim(base: address))
+        let driver = SimDriver(sim: Sim(udid: device))
         _ = try await driver.connect()
         _ = await driver.settledScreen()
         print("running")
@@ -180,8 +183,7 @@ case "run":
     }
 case "open":
     untilDone {
-        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-        print(try await showPane(device: address.lastPathComponent))
+        print(try await showPane(device: try await Simulators.booted(arguments.string("device"))))
     }
 case "screenshot":
     onSimulator { driver in
@@ -259,8 +261,8 @@ case "strobe":
         let scene = try await scene()
         if !arguments.flag("pattern") {
             // The picture shows the app as it is on the open device, on every exposure.
-            let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-            let screen = try await SimDriver(sim: Sim(base: address)).screens(at: [180])[0]
+            let device = try await Simulators.booted(arguments.string("device"))
+            let screen = try await SimDriver(sim: Sim(udid: device)).screens(at: [180])[0]
             scene.setScreen(.inner, texture: try await TextureResource(image: screen, options: .init(semantic: .color)))
         }
         try await Strobe.write(scene: scene, width: size[0], height: size[1], to: out)
@@ -280,9 +282,9 @@ case "film":
             // No simulator: the test patterns stand in for the app.
             screens = []
         } else {
-            let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
+            let device = try await Simulators.booted(arguments.string("device"))
             print("taking the app's screens from the simulator")
-            screens = try await SimDriver(sim: Sim(base: address)).screens(at: [0, 180, FilmScript.book])
+            screens = try await SimDriver(sim: Sim(udid: device)).screens(at: [0, 180, FilmScript.book])
         }
         let textures: [TextureResource] = try await screens.isEmpty
             ? [Snapshot.testPattern(label: "COVER", width: 600, height: 1300), Snapshot.testPattern(label: "INNER", width: 1200, height: 1300),
@@ -299,8 +301,8 @@ case "sweep":
         let out = arguments.string("out").map { URL(fileURLWithPath: $0) } ?? ScreenShot.temporaryFile("sweep")
         try mustBeWritable(out)
         let scene = try await DuoScene(finish: arguments.string("finish") ?? "Dark")
-        let address = try await SimServer.address(device: arguments.string("device"), server: arguments.string("server"))
-        let shots = try await Sweep(sim: Sim(base: address), scene: scene).run { print($0) }
+        let device = try await Simulators.booted(arguments.string("device"))
+        let shots = try await Sweep(sim: Sim(udid: device), scene: scene).run { print($0) }
         try ContactSheet.write(shots, to: out)
         print(out.path)
     }
@@ -328,7 +330,7 @@ case "view", "record":
             running.start()
             guard !arguments.flag("pattern") else { return running.showKeys() }
             do {
-                running.attach(to: try await SimServer.address(device: arguments.string("device"), server: arguments.string("server")))
+                running.attach(to: try await Simulators.booted(arguments.string("device")))
             } catch {
                 running.show("\(error)")
             }

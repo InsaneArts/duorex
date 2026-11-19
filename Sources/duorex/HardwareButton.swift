@@ -8,7 +8,7 @@ nonisolated enum HardwareButton: String, CaseIterable {
     case power = "Power"
     case cameraControl = "Camera control"
 
-    /// The HID usage serve-sim sends for the button: the usage page and the usage.
+    /// The button's HID usage: the usage page and the usage.
     var usage: (page: Int, usage: Int) {
         switch self {
         case .volumeDown: (12, 234)

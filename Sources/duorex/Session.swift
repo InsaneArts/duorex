@@ -105,11 +105,11 @@ final class Session {
         RunLoop.main.add(rates, forMode: .common)
     }
 
-    /// Connects the device to a simulator on serve-sim.
-    func attach(to address: URL) {
-        log.info("simulator at \(address.absoluteString, privacy: .public)")
+    /// Connects the device to a simulator.
+    func attach(to udid: String) {
+        log.info("simulator \(udid, privacy: .public)")
         let attached = CACurrentMediaTime()
-        let sim = Sim(base: address)
+        let sim = Sim(udid: udid)
         self.sim = sim
         sim.onFrame = { [unowned self] frame in
             if framesDecoded == 0, status != hint {
