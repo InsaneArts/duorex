@@ -201,7 +201,6 @@ final class Session {
     }
 
     /// Goes home the way a finger does: a quick swipe up from the bottom edge of the interface.
-    /// serve-sim's own home button does not reach the Duo.
     private func swipeHome() {
         guard let sim else { return }
         let steps = 12
