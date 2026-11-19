@@ -2,6 +2,25 @@
 
 Each release of duorex, newest first. Changes that are not in a release yet are under `## Unreleased`.
 
+## 0.2.0
+
+duorex runs the simulator through [simhost](https://github.com/InsaneArts/simhost) instead of serve-sim, and no longer needs Node.js.
+
+**The simulator**
+- A touch shows on the screen about three times sooner: 5.6 ms from the touch to the frame that shows it, where serve-sim took 16.7 ms.
+- The screens come straight from the simulator's framebuffers, at full resolution, with no video in between.
+- duorex knows the hinge angle from the start, to the degree. With Xcode 27.2, 0.1.0 showed `hinge unknown` until something folded the device.
+
+**For an agent**
+- `duorex type` types into the app, in the field that has focus.
+- An agent's swipe draws its trail while the finger moves, not after it.
+
+**Removed**
+- `--server`. There is no server to attach to.
+
+**From 0.1.0**
+- The serve-sim that 0.1.0 started can still run. To stop it: `npx --yes serve-sim@0.1.49 --kill "duorex Duo"`.
+
 ## 0.1.0
 
 The first release.
