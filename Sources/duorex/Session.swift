@@ -2,10 +2,21 @@ import AppKit
 
 /// One run of duorex in a terminal pane: the pane's input, the device drawn over it, and the simulator behind it.
 final class Session {
+    /// How the device looks: iPhone Duo in 3D, or another iPhone flat, in Xcode's chrome.
+    enum Look {
+        case duo(DuoScene)
+        case flat(DeviceChrome)
+    }
+
     private let pane: Pane
-    private let stage: StageView
+    /// The view that draws the device.
+    private let stage: any DeviceView
+    /// The same view when it is iPhone Duo's, for what only that device does: fold, and record.
+    private let duo: StageView?
+    private let flat: FlatStageView?
     private let dock: Dock
-    private let feed: ScreenFeed
+    /// Puts the simulator's pictures on iPhone Duo's screens. A flat device shows them itself.
+    private let feed: ScreenFeed?
     private let rex: RexHost?
     private let sound = FoldSound()
     private var sim: Sim?
@@ -27,9 +38,14 @@ final class Session {
 
     /// The keys, as lines short enough for a narrow pane. "?" shows the next line.
     private var hint: String {
-        [stage.recorder == nil ? "drag frame to fold  ·  1 2 3 poses  ·  ? keys  ·  q quit" : "● recording  ·  ? keys  ·  q stops and saves",
-         "r rotate  ·  h home  ·  d dark  ·  + - text  ·  ? more",
-         "s slow  ·  w memory  ·  m sound  ·  g glow  ·  ? back"][hintLine]
+        guard let duo else {
+            return ["r rotate  ·  h home  ·  ? keys  ·  q quit",
+                    "d dark  ·  + - text  ·  s slow  ·  ? more",
+                    "w memory  ·  g glow  ·  ? back"][hintLine]
+        }
+        return [duo.recorder == nil ? "drag frame to fold  ·  1 2 3 poses  ·  ? keys  ·  q quit" : "● recording  ·  ? keys  ·  q stops and saves",
+                "r rotate  ·  h home  ·  d dark  ·  + - text  ·  ? more",
+                "s slow  ·  w memory  ·  m sound  ·  g glow  ·  ? back"][hintLine]
     }
     private var hintLine = 0
     /// A word about the key that was just pressed. It gives way to the usual line after a moment.
@@ -41,12 +57,24 @@ final class Session {
     /// Hinge angles for the three poses the number keys choose.
     private static let poses: [Character: Double] = ["1": 0, "2": 130, "3": 180]
 
-    /// `movie` is where to record the device to, or nil to only show it.
-    init(scene: DuoScene, movie: (url: URL, width: Int, height: Int)? = nil) throws {
+    /// `movie` is where to record the device to, or nil to only show it. Only iPhone Duo records.
+    init(look: Look, movie: (url: URL, width: Int, height: Int)? = nil) throws {
         pane = try Pane()
-        stage = StageView(scene: scene)
-        stage.recorder = try movie.map { try Recorder(scene: scene, url: $0.url, width: $0.width, height: $0.height) }
-        feed = try ScreenFeed(scene: scene)
+        switch look {
+        case .duo(let scene):
+            let duo = StageView(scene: scene)
+            duo.recorder = try movie.map { try Recorder(scene: scene, url: $0.url, width: $0.width, height: $0.height) }
+            self.duo = duo
+            flat = nil
+            stage = duo
+            feed = try ScreenFeed(scene: scene)
+        case .flat(let chrome):
+            let flat = FlatStageView(chrome: chrome)
+            self.flat = flat
+            duo = nil
+            stage = flat
+            feed = nil
+        }
         rex = RexHost()
         dock = Dock(stage: stage, hostBundleID: rex == nil ? nil : RexHost.bundleID)
     }
@@ -116,14 +144,19 @@ final class Session {
                 log.info("first picture \(CACurrentMediaTime() - attached, format: .fixed(precision: 2)) s after attaching")
             }
             framesDecoded += 1
+            guard let duo, let feed else {
+                flat?.show(frame)
+                if status != hint { show(hint) }
+                return
+            }
             guard let panel = feed.show(frame) else { return }
-            if panel != stage.activePanel || status != hint {
-                stage.activePanel = panel
+            if panel != duo.activePanel || status != hint {
+                duo.activePanel = panel
                 feed.turnOff(panel.other)
                 move(sync.panelLit(panel))
                 show(hint)
             }
-            stage.setNeedsRender()
+            duo.setNeedsRender()
         }
         sim.onReport = { [unowned self] report in
             interface = Orientation(rawValue: report.orientation) ?? .portrait
@@ -132,8 +165,8 @@ final class Session {
                let turned = sync.simulatorReported(held: held, time: now) {
                 stage.rotate(to: turned.roll)
             }
-            if let hinge = report.hingeDegrees {
-                move(sync.simulatorReported(hinge: hinge, shown: stage.hingeDegrees, time: now))
+            if let duo, let hinge = report.hingeDegrees {
+                move(sync.simulatorReported(hinge: hinge, shown: duo.hingeDegrees, time: now))
             }
         }
         sim.onActivity = { [unowned self] activity in
@@ -186,16 +219,20 @@ final class Session {
         }
     }
 
-    /// Shows the keys, as when there is no simulator to wait for.
+    /// Shows the keys, as when there is no simulator to wait for. A flat device shows the test pattern.
     func showKeys() {
+        if let flat, case let size = flat.screenPixels,
+           let pattern = try? Snapshot.testPatternImage(label: "SCREEN", width: Int(size.width), height: Int(size.height)) {
+            flat.show(picture: pattern)
+        }
         show(hint)
     }
 
     /// Does what the sync decided about a hinge angle from the simulator.
     private func move(_ action: PoseSync.HingeAction) {
         switch action {
-        case .snap(let degrees): stage.follow(hinge: degrees, animated: false)
-        case .follow(let degrees): stage.follow(hinge: degrees, animated: true)
+        case .snap(let degrees): duo?.follow(hinge: degrees, animated: false)
+        case .follow(let degrees): duo?.follow(hinge: degrees, animated: true)
         case .ignore: break
         }
     }
@@ -235,9 +272,13 @@ final class Session {
         case .key(let key):
             switch key {
             case "q", "\u{03}", "\u{04}": quit()
-            case "1", "2", "3": stage.fold(to: Self.poses[key]!)
-            case "[": stage.fold(to: stage.hingeDegrees - 10)
-            case "]": stage.fold(to: stage.hingeDegrees + 10)
+            case "1", "2", "3", "[", "]":
+                guard let duo else { tell("this iPhone does not fold"); break }
+                switch key {
+                case "[": duo.fold(to: duo.hingeDegrees - 10)
+                case "]": duo.fold(to: duo.hingeDegrees + 10)
+                default: duo.fold(to: Self.poses[key]!)
+                }
             case "h": swipeHome()
             case "r":
                 let held = sync.userTurned(time: CACurrentMediaTime())
@@ -261,6 +302,7 @@ final class Session {
                 sim.send(.memoryWarning)
                 tell("memory warning")
             case "m":
+                guard duo != nil else { tell("this iPhone does not fold, so it makes no sound"); break }
                 sound.isMuted.toggle()
                 tell(sound.isMuted ? "sound off" : "sound on")
             case "g":
@@ -295,14 +337,14 @@ final class Session {
         Panes.closed()
         sim?.stop()
         rex?.stop()
-        guard let recorder = stage.recorder else {
+        guard let duo, let recorder = duo.recorder else {
             pane.restore()
             exit(0)
         }
         show("saving the movie…")
         Task {
             do {
-                try await recorder.finish(scene: stage.scene, time: CACurrentMediaTime())
+                try await recorder.finish(scene: duo.scene, time: CACurrentMediaTime())
                 pane.restore()
                 print(recorder.url.path)
                 exit(0)

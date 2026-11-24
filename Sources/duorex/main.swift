@@ -350,12 +350,22 @@ case "view", "record":
                 }
                 movie = (arguments.string("out").map { URL(fileURLWithPath: $0) } ?? folder.appendingPathComponent("duorex-\(stamp.string(from: Date())).mp4"), size[0], size[1])
             }
-            let running = try Session(scene: try await scene(), movie: movie)
+            // The device decides the look: iPhone Duo in 3D, any other iPhone flat.
+            let device = try await Simulators.find(arguments.string("device"))
+            let look: Session.Look
+            if device.isDuo {
+                look = .duo(try await scene())
+            } else {
+                guard movie == nil else { throw DuoError.render("record films iPhone Duo only, and \(device.name) is not one") }
+                look = .flat(try DeviceChrome(typeBundle: try await Simulators.typeBundle(device.type)))
+            }
+            let running = try Session(look: look, movie: movie)
             session = running
             running.start()
             guard !arguments.flag("pattern") else { return running.showKeys() }
             do {
-                running.attach(to: try await Simulators.booted(arguments.string("device")))
+                try await Simulators.boot(device.udid)
+                running.attach(to: device.udid)
             } catch {
                 running.show("\(error)")
             }
