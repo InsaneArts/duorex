@@ -10,6 +10,9 @@ Each release of duorex, newest first. Changes that are not in a release yet are 
 - `duorex press action` presses the Action button.
 - `duorex snapshot --device "iPhone 18 Pro"` draws a flat iPhone with a test pattern on its screen.
 
+**Fixed**
+- `duorex rotate clockwise` turned the simulator counterclockwise, and iPhone Duo's model turned the opposite way from its simulator. Both turn the same way now, clockwise for clockwise, also with `r`.
+
 ## 0.2.0
 
 duorex runs the simulator through [simhost](https://github.com/InsaneArts/simhost) instead of serve-sim, and no longer needs Node.js.
