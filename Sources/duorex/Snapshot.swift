@@ -14,9 +14,7 @@ enum Snapshot {
         let staged = onStage ? CIContext(mtlDevice: scene.device).createCGImage(
             Stage.compose(CIImage(ioSurface: frame.surface), over: Stage.image(width: width, height: height)),
             from: CGRect(x: 0, y: 0, width: width, height: height)) : nil
-        guard var image = staged ?? frame.image(),
-              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
-        else { throw DuoError.render("could not encode the snapshot") }
+        guard var image = staged ?? frame.image() else { throw DuoError.render("could not encode the snapshot") }
         if let backdrop, let space = image.colorSpace,
            let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                    space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
@@ -25,12 +23,23 @@ enum Snapshot {
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             image = context.makeImage() ?? image
         }
+        try writePNG(image, to: url)
+    }
+
+    static func writePNG(_ image: CGImage, to url: URL) throws {
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
+        else { throw DuoError.render("could not encode the snapshot") }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { throw DuoError.render("could not write \(url.path)") }
     }
 
     /// A framebuffer stand-in that shows which way up a screen is.
     static func testPattern(label: String, width: Int, height: Int) throws -> TextureResource {
+        try TextureResource(image: try testPatternImage(label: label, width: width, height: height), options: .init(semantic: .color))
+    }
+
+    /// The test pattern as a picture.
+    static func testPatternImage(label: String, width: Int, height: Int) throws -> CGImage {
         guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { throw DuoError.render("could not draw the test pattern") }
@@ -50,6 +59,6 @@ enum Snapshot {
         text.draw(at: CGPoint(x: w * 0.08, y: h * 0.45))
         NSGraphicsContext.restoreGraphicsState()
         guard let image = context.makeImage() else { throw DuoError.render("could not draw the test pattern") }
-        return try TextureResource(image: image, options: .init(semantic: .color))
+        return image
     }
 }

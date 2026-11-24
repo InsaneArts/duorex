@@ -139,6 +139,16 @@ case "update":
 case "snapshot":
     Task {
         do {
+            // Any iPhone but the Duo is drawn flat, as Simulator.app draws it.
+            if let device = arguments.string("device"), case let type = try await Simulators.type(of: device), type != Simulators.duoType {
+                let chrome = try DeviceChrome(typeBundle: try await Simulators.typeBundle(type))
+                let screen = try Snapshot.testPatternImage(label: "SCREEN", width: Int(chrome.screenPixels.width), height: Int(chrome.screenPixels.height))
+                let out = URL(fileURLWithPath: arguments.string("out") ?? "duorex.png")
+                guard let picture = chrome.picture(screen: screen, scale: arguments.double("scale", default: 2)) else { throw DuoError.render("could not draw the device") }
+                try Snapshot.writePNG(picture, to: out)
+                print(out.path)
+                exit(0)
+            }
             var pose = Pose(hinge: arguments.double("hinge", default: 180), roll: arguments.double("roll", default: 0),
                             yaw: arguments.double("yaw", default: 0), pitch: arguments.double("pitch", default: 0))
             if let button = arguments.string("press").flatMap({ name in HardwareButton.allCases.first { $0.rawValue.lowercased() == name.lowercased() } }) {
