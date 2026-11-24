@@ -26,7 +26,7 @@ final class Sweep {
     }
 
     static let postures = [Posture(name: "Closed", hinge: 0), Posture(name: "Book", hinge: 130), Posture(name: "Open", hinge: 180)]
-    static let holds = [Orientation.portrait, .landscapeLeft]
+    static let holds = [Orientation.portrait, .landscapeRight]
 
     private let driver: SimDriver
     private let scene: DuoScene
@@ -100,9 +100,9 @@ extension Orientation {
     var label: String {
         switch self {
         case .portrait: "upright"
-        case .landscapeLeft: "turned clockwise"
+        case .landscapeLeft: "turned counterclockwise"
         case .upsideDown: "upside down"
-        case .landscapeRight: "turned counterclockwise"
+        case .landscapeRight: "turned clockwise"
         }
     }
 

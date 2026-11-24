@@ -328,7 +328,7 @@ nonisolated struct DeviceMotion {
     /// How far `point` lies from `origin` along the device's width, which turns with the roll.
     private func along(_ point: CGPoint, from origin: CGPoint) -> Double {
         let turn = roll.value * .pi / 180
-        return Double(point.x - origin.x) * cos(turn) - Double(point.y - origin.y) * sin(turn)
+        return Double(point.x - origin.x) * cos(turn) + Double(point.y - origin.y) * sin(turn)
     }
 
     /// The same direction as `degrees`, as an angle from -180 to 180.

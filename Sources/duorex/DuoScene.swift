@@ -172,7 +172,7 @@ final class DuoScene {
         // away. So a drag up or down leans it the same way from the front and from the back.
         orbit.orientation = simd_quatf(angle: Float(pose.pitch * .pi / 180), axis: [1, 0, 0])
             * simd_quatf(angle: Float(pose.yaw * .pi / 180), axis: [0, 1, 0])
-            * simd_quatf(angle: Float(pose.roll * .pi / 180), axis: [0, 0, 1])
+            * simd_quatf(angle: Float(-pose.roll * .pi / 180), axis: [0, 0, 1])
         // The marks lie on the screen, so they are placed last, on the screen as it is now.
         markLayer.show(marks, on: marks.isEmpty ? [] : surfaces[panel]?.worldLeaves() ?? [])
     }
@@ -281,7 +281,7 @@ final class DuoScene {
                 return point.z + max(abs(point.x) / (tangent * aspect), abs(point.y) / tangent)
             }.max() ?? 1
         }
-        let roll = simd_quatf(angle: Float(pose.roll * .pi / 180), axis: [0, 0, 1])
+        let roll = simd_quatf(angle: Float(-pose.roll * .pi / 180), axis: [0, 0, 1])
         return max(fit(roll) * 1.19, fit(orbit.orientation) * 1.07)
     }
 

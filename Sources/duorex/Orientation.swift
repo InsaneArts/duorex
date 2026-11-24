@@ -8,7 +8,8 @@ nonisolated enum Orientation: String, CaseIterable {
     case upsideDown = "portrait_upside_down"
     case landscapeRight = "landscape_right"
 
-    /// The device's roll when it is held this way, in degrees.
+    /// The device's roll when it is held this way, in degrees clockwise on the screen. Held
+    /// landscape left, the device's top is on the left: UIKit's names, as the simulator has them.
     var roll: Double {
         switch self {
         case .portrait: 0
@@ -18,10 +19,14 @@ nonisolated enum Orientation: String, CaseIterable {
         }
     }
 
-    /// The next quarter turn.
+    /// The next quarter turn clockwise.
     var next: Orientation {
-        let all = Self.allCases
-        return all[(all.firstIndex(of: self)! + 1) % all.count]
+        switch self {
+        case .portrait: .landscapeRight
+        case .landscapeRight: .upsideDown
+        case .upsideDown: .landscapeLeft
+        case .landscapeLeft: .portrait
+        }
     }
 
     /// Where a point of the interface lies in the framebuffer. Both are 0...1 with the origin at the top left.
