@@ -1,12 +1,13 @@
 import RealityKit
 import simd
 
-/// One of the device's four hardware buttons.
+/// One of the device's hardware buttons. iPhone Duo has all but the Action button.
 nonisolated enum HardwareButton: String, CaseIterable {
     case volumeDown = "Volume down"
     case volumeUp = "Volume up"
     case power = "Power"
     case cameraControl = "Camera control"
+    case action = "Action"
 
     /// The button's HID usage: the usage page and the usage.
     var usage: (page: Int, usage: Int) {
@@ -15,16 +16,18 @@ nonisolated enum HardwareButton: String, CaseIterable {
         case .volumeUp: (12, 233)
         case .power: (12, 48)
         case .cameraControl: (65280, 102)
+        case .action: (11, 45)
         }
     }
 
-    /// The name of the button's part in Apple's model.
-    fileprivate var part: String {
+    /// The name of the button's part in Apple's iPhone Duo model, which has no Action button.
+    fileprivate var part: String? {
         switch self {
         case .volumeDown: "CmYdOlPKmuMDoXR"
         case .volumeUp: "koDLxoGBdfDshrV"
         case .power: "eMjBYLfkSbgWYfC"
         case .cameraControl: "OLwRWbIGbztiQrw"
+        case .action: nil
         }
     }
 }
@@ -58,7 +61,7 @@ final class HardwareButtons {
         joints = skeleton.joints
         jointIndices = joints.map { entity.jointNames.firstIndex(of: $0.name) }
         let bounds = entity.model!.mesh.bounds
-        for button in HardwareButton.allCases {
+        for button in HardwareButton.allCases where button.part != nil {
             // Each button is one rigid part: every vertex follows a single joint.
             guard let part = parts.first(where: { $0.id == button.part }), part.skeletonID == skeletonID,
                   let skeletonJoint = part.jointInfluences?.influences.elements.first(where: { $0.weight > 0 })?.jointIndex,
