@@ -139,6 +139,18 @@ duorex sweep --out sweep.png
 
 It takes about 20 seconds and puts the simulator back the way it was. Without `--out`, the picture goes to a temporary folder, and the command prints its path. Run it from any shell: it needs no pane. With a duorex pane open, you watch the sweep happen in it.
 
+### Any iPhone, not only the Duo
+
+duorex shows every current iPhone. The Duo is the 3D model you fold. Every other iPhone is drawn flat, in the chrome Simulator.app uses, with its live screen. You touch, scroll and pinch it, press its buttons and turn it with `r`, the same way. An agent drives it with the same commands.
+
+```sh
+duorex devices                       # the iPhones duorex shows
+duorex --device "iPhone 18 Pro"      # show one in the pane
+duorex run --device "iPhone 17"      # build your app and run it on one
+```
+
+The first time you name a model, duorex makes a simulator of it, named "duorex iPhone 18 Pro", and starts it. An iPhone simulator you made yourself works too, by its name or UDID. Folding, `sweep`, `strobe`, `film` and `record` need the Duo.
+
 ### It stays in its pane
 
 <p align="center">
@@ -231,7 +243,7 @@ The first time duorex runs in a terminal, move the pointer over the pane once. T
 
 Options:
 
-- `--device <name|udid>` uses another iPhone Duo simulator.
+- `--device <model|name|udid>` shows another iPhone: a model that `duorex devices` lists, or a simulator by its name or UDID.
 - `--finish Light` shows the light model. The default is `Dark`.
 
 ## Limits
@@ -252,7 +264,7 @@ swift test
 .build/debug/duorex snapshot --pattern --touch 0.3,0.4 --out duorex-tap.png   # the same, with a touch mark
 ```
 
-The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Simulators` finds and starts the simulator. `Sim` reads its screens and sends input through [simhost](https://github.com/InsaneArts/simhost), `SimWire` puts simhost's messages in duorex's terms, and `ScreenFeed` puts the screens on the device. `PoseSync` decides whether the device or the simulator moved first. duorex starts the simulator's host as `duorex host <udid>` when none runs. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is.
+The device is `DuoScene`, drawn into `Frame`s by `StageView`. `DeviceMotion` holds its pose and turns the pointer into touches, tilts and folds. `Simulators` finds and starts the simulator. `Sim` reads its screens and sends input through [simhost](https://github.com/InsaneArts/simhost), `SimWire` puts simhost's messages in duorex's terms, and `ScreenFeed` puts the screens on the device. `PoseSync` decides whether the device or the simulator moved first. duorex starts the simulator's host as `duorex host <udid>` when none runs. `Presence` turns the touches of other clients into marks, and `MarkLayer` draws them on the screen. `SimDriver` drives the simulator for the commands an agent runs, `AppRunner` builds and starts an app, and `Panes` knows which Rex sessions have a pane. `Pane` reads the terminal through `TerminalInput`, and `Dock` keeps the window where `PaneLocator` says the pane is. Every other iPhone is drawn by `FlatStageView`, in the chrome that `DeviceChrome` loads from Xcode, placed by `FlatGeometry`. `Simulators` finds or makes the simulator a name stands for.
 
 ## Contributing
 

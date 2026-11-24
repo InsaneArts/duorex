@@ -1,6 +1,6 @@
 ---
 name: duorex
-description: Builds an iOS app, runs it on an iPhone Duo simulator and uses it there - looks at the screen, taps, swipes, folds and rotates the device, and checks its postures - while the user watches the device in a Rex pane. Use when the user asks to run, try, test, check or show an app on iPhone Duo, "the Duo" or the foldable iPhone; after you change an iOS app that must work on iPhone Duo; or when the user mentions duorex.
+description: Builds an iOS app, runs it on an iPhone Duo simulator or another iPhone simulator and uses it there - looks at the screen, taps, swipes, folds and rotates the device, and checks its postures - while the user watches the device in a Rex pane. Use when the user asks to run, try, test, check or show an app on iPhone Duo, "the Duo" or the foldable iPhone; after you change an iOS app that must work on iPhone Duo; or when the user mentions duorex.
 ---
 
 # duorex
@@ -48,11 +48,22 @@ A point is two numbers from 0 to 1 on the newest screenshot: x runs right, y run
 duorex tap 0.62 0.35
 duorex swipe 0.5 0.8 0.5 0.3     # a finger moves from the first point to the second
 duorex home
-duorex press power               # power, volume-up, volume-down, camera
+duorex press power               # power, volume-up, volume-down, camera, action
 duorex type "hello@example.com"  # into the field that has focus; tap the field first
 ```
 
 `type` takes printable ASCII, as on a US keyboard. A line break in the text is the return key.
+
+## Other iPhones
+
+The Duo is the default. To use another iPhone, add `--device` to every command, with a model that `duorex devices` lists or a simulator's name:
+
+```sh
+duorex run --device "iPhone 18 Pro"
+duorex screenshot --device "iPhone 18 Pro"
+```
+
+The first command makes and starts the simulator, which takes a minute or two. These iPhones have one screen, so the last line is like `screen 1206x2622, held upright`, and they do not fold: `fold` and `sweep` need the Duo.
 
 ## Fold and turn
 

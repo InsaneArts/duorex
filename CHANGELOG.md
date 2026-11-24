@@ -2,6 +2,14 @@
 
 Each release of duorex, newest first. Changes that are not in a release yet are under `## Unreleased`.
 
+## Unreleased
+
+**Every iPhone**
+- duorex shows any iPhone. The Duo stays in 3D. Every other iPhone is drawn flat, in the chrome Simulator.app uses, with its live screen, its side buttons and the agent's marks.
+- `duorex devices` lists the current iPhones. `--device "iPhone 18 Pro"` shows one, and makes its simulator the first time.
+- `duorex press action` presses the Action button.
+- `duorex snapshot --device "iPhone 18 Pro"` draws a flat iPhone with a test pattern on its screen.
+
 ## 0.2.0
 
 duorex runs the simulator through [simhost](https://github.com/InsaneArts/simhost) instead of serve-sim, and no longer needs Node.js.
