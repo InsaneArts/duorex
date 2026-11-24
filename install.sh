@@ -82,9 +82,10 @@ install_skill() {
   [ -f "$src/skills/duorex/SKILL.md" ] || return 0
   for agent in "$HOME/.claude" "$HOME/.codex" "$HOME/.pi/agent"; do
     [ -d "$agent" ] || continue
-    if ! cmp -s "$src/skills/duorex/SKILL.md" "$agent/skills/duorex/SKILL.md"; then
+    # The whole folder: the skill points to its other files.
+    if ! diff -rq "$src/skills/duorex" "$agent/skills/duorex" >/dev/null 2>&1; then
       mkdir -p "$agent/skills/duorex"
-      cp "$src/skills/duorex/SKILL.md" "$agent/skills/duorex/SKILL.md"
+      cp -R "$src/skills/duorex/." "$agent/skills/duorex/"
       skill_note="$skill_note
 Skill: $agent/skills/duorex"
     fi

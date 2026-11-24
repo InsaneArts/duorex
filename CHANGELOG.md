@@ -10,6 +10,9 @@ Each release of duorex, newest first. Changes that are not in a release yet are 
 - `duorex press action` presses the Action button.
 - `duorex snapshot --device "iPhone 18 Pro"` draws a flat iPhone with a test pattern on its screen.
 
+**For an agent**
+- The `duorex` skill tells agents to use duorex whenever they build, run or check an iOS app, and covers every command, the pane's keys, and what to do when a command fails.
+
 **Fixed**
 - `duorex rotate clockwise` turned the simulator counterclockwise, and iPhone Duo's model turned the opposite way from its simulator. Both turn the same way now, clockwise for clockwise, also with `r`.
 
