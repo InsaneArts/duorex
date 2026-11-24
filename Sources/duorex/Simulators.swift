@@ -111,11 +111,34 @@ enum Simulators {
     }
 
     private static func deviceTypes() async throws -> [(name: String, identifier: String)] {
+        try await typeList().map { ($0.name, $0.identifier) }
+    }
+
+    private static func typeList() async throws -> [(name: String, identifier: String, bundle: URL?)] {
         let list = try await Shell.run("/usr/bin/xcrun", ["simctl", "list", "devicetypes", "--json"])
         let types = (try? JSONSerialization.jsonObject(with: Data(list.utf8)) as? [String: Any])?["devicetypes"] as? [[String: Any]] ?? []
         return types.compactMap { type in
             guard let name = type["name"] as? String, let identifier = type["identifier"] as? String else { return nil }
-            return (name, identifier)
+            return (name, identifier, (type["bundlePath"] as? String).map { URL(fileURLWithPath: $0) })
+        }
+    }
+
+    /// The device type bundle of a device type, such as com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro.
+    static func typeBundle(_ type: String) async throws -> URL {
+        guard let bundle = try await typeList().first(where: { $0.identifier == type })?.bundle else {
+            throw DuoError.sim("Xcode has no device type \(type)")
+        }
+        return bundle
+    }
+
+    /// The device type that a name stands for, without making a simulator: the type of a
+    /// simulator of that name, or the iPhone model of that name.
+    static func type(of device: String) async throws -> String {
+        let simulators = try await available()
+        switch choose(device, simulators: simulators, types: try await deviceTypes()) {
+        case .existing(let found): return found.type
+        case .make(_, let type): return type
+        case nil: throw DuoError.sim("no simulator or iPhone model is named \"\(device)\". `duorex devices` lists the iPhones.")
         }
     }
 
