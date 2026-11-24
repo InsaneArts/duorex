@@ -2,6 +2,12 @@
 
 Each release of duorex, newest first. Changes that are not in a release yet are under `## Unreleased`.
 
+## 0.3.1
+
+**Fixed**
+- An update from 0.2.0 installed the `duorex` skill without the file it points to for the pane's keys, the pictures and the failures. The skill is one file again.
+- `duorex update` ran the installer of the release it left. The new release's own installer now takes over, so a change to the installer counts in the same update.
+
 ## 0.3.0
 
 **Every iPhone**

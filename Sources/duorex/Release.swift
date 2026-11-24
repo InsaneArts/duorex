@@ -3,7 +3,7 @@ import Foundation
 /// The release this build is, and the way to get a newer one.
 enum Release {
     /// Matches the release tag: version 0.1.0 is tagged v0.1.0.
-    static let version = "0.3.0"
+    static let version = "0.3.1"
 
     /// Where `install.sh` keeps the source it builds from. It reads the same variables as the installer.
     private static var source: URL {
