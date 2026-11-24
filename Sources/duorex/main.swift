@@ -95,7 +95,8 @@ func scene() async throws -> DuoScene {
 
 /// How to use duorex, for `--help` and for a command that duorex does not know.
 let usageText = """
-usage: duorex [view] [--device name|udid] [--finish Dark|Light]
+usage: duorex [view] [--device model|name|udid] [--finish Dark|Light]
+       duorex devices                                    the iPhones duorex shows
 
 for an agent:
   duorex run [folder] [--scheme name] [--app path.app]   build the app, start it, and open the pane
@@ -126,6 +127,8 @@ case "help":
     print(usageText, terminator: "")
 case "version":
     print(Release.version)
+case "devices":
+    untilDone { print(try await Simulators.listing()) }
 case "host":
     // The one process that owns a simulator's input. duorex starts it when none runs, and every
     // client of the simulator shares it. It exits ten minutes after its last client leaves.
