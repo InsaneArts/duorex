@@ -13,7 +13,7 @@ final class Dock {
         var titleSuffix: String?
     }
 
-    let stage: StageView
+    let stage: any DeviceView
     var placement = Placement() { didSet { updateLayout() } }
 
     private let panel: NSPanel
@@ -29,7 +29,7 @@ final class Dock {
     private var timer: Timer?
     private var activation: NSObjectProtocol?
 
-    init(stage: StageView, hostBundleID: String?) {
+    init(stage: any DeviceView, hostBundleID: String?) {
         self.stage = stage
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
