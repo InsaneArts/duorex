@@ -41,6 +41,10 @@ final class Sweep {
     /// posture, and when the task is cancelled. Either way the simulator is put back first.
     func run(progress: (String) -> Void) async throws -> [Shot] {
         let start = try await driver.connect()
+        guard driver.isDuo else {
+            driver.stop()
+            throw DuoError.sim("a sweep folds the device, and needs iPhone Duo. Run it with the Duo.")
+        }
 
         var shots: [Shot] = []
         var hinge = start.hinge

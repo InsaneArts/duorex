@@ -107,7 +107,7 @@ for an agent:
   duorex home
   duorex fold closed|book|open|DEGREES
   duorex rotate upright|clockwise|upside-down|counterclockwise
-  duorex press power|volume-up|volume-down|camera
+  duorex press power|volume-up|volume-down|camera|action
   duorex sweep [--out sheet.png]                         six postures in one picture
   duorex open                                            only open the pane
 
@@ -248,6 +248,7 @@ case "fold":
         wrongUse("fold closed|book|open, or an angle from 0 to 180")
     }
     onSimulator { driver in
+        guard driver.isDuo else { throw DuoError.sim("this iPhone does not fold. Only iPhone Duo does.") }
         let start = driver.report?.hingeDegrees ?? (driver.litPanel == .cover ? 0 : 180)
         guard await driver.fold(from: start, to: target) else {
             try Task.checkCancellation()
@@ -268,8 +269,8 @@ case "rotate":
         return "held \(held.label)"
     }
 case "press":
-    let buttons: [String: HardwareButton] = ["power": .power, "volume-up": .volumeUp, "volume-down": .volumeDown, "camera": .cameraControl]
-    guard let button = arguments.words.first.flatMap({ buttons[$0] }) else { wrongUse("press power|volume-up|volume-down|camera") }
+    let buttons: [String: HardwareButton] = ["power": .power, "volume-up": .volumeUp, "volume-down": .volumeDown, "camera": .cameraControl, "action": .action]
+    guard let button = arguments.words.first.flatMap({ buttons[$0] }) else { wrongUse("press power|volume-up|volume-down|camera|action") }
     onSimulator { driver in
         await driver.press(button)
         await settle()

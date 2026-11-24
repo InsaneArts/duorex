@@ -45,10 +45,15 @@ final class SimDriver {
         guard let screen, let panel = litPanel else { return "no picture from the simulator yet" }
         let turned = interface.quarterTurnsToUpright % 2 == 1
         let size = turned ? "\(screen.height)x\(screen.width)" : "\(screen.width)x\(screen.height)"
-        let hinge = report?.hingeDegrees.map { "hinge \(Int($0.rounded()))" } ?? "hinge unknown"
         let held = report?.duoViewOrientation.flatMap(Orientation.init(rawValue:))?.label ?? "upright"
+        // A device with one screen has no hinge to tell.
+        guard isDuo else { return "screen \(size), held \(held)" }
+        let hinge = report?.hingeDegrees.map { "hinge \(Int($0.rounded()))" } ?? "hinge unknown"
         return "\(panel.rawValue) screen \(size), \(hinge), held \(held)"
     }
+
+    /// True for iPhone Duo, false for an iPhone with one screen. Known once connected.
+    var isDuo: Bool { sim.isDuo }
 
     // MARK: An agent's hands
 
@@ -108,8 +113,8 @@ final class SimDriver {
             throw DuoError.sim("the simulator sent no picture. Is it booted?")
         }
         // A host that just started reports the hinge once its helper in the simulator is running,
-        // most of a second after its first report.
-        _ = await wait(seconds: 3) { report?.hingeDegrees != nil }
+        // most of a second after its first report. A device with one screen has no hinge.
+        if isDuo { _ = await wait(seconds: 3) { report?.hingeDegrees != nil } }
         // A simulator that started a moment ago shows an Apple logo for one or two minutes, also
         // after Xcode calls it booted. Its picture is not worth taking, and a fold sent meanwhile
         // is acted on late.
@@ -126,6 +131,10 @@ final class SimDriver {
     /// The simulator is folded and turned for the pictures, and put back after.
     func screens(at hinges: [Double]) async throws -> [CGImage] {
         let start = try await connect()
+        guard isDuo else {
+            stop()
+            throw DuoError.sim("the pictures of the folds need iPhone Duo. Run this with the Duo.")
+        }
         var screens: [CGImage] = []
         var hinge = start.hinge
         if await turn(to: .portrait) {
@@ -200,7 +209,7 @@ final class SimDriver {
         // A host that knows no hinge, because its helper did not start, cannot check a turn.
         // It is told the angle that the lit panel shows, as `PoseSync` does for the pane.
         // That can move the device, so only a command that turns it does this.
-        if report?.hingeDegrees == nil {
+        if isDuo, report?.hingeDegrees == nil {
             let shown: Double = litPanel == .cover ? 0 : 180
             // A fold that comes too early is dropped, so it goes out until it lands.
             let deadline = Date().addingTimeInterval(60)
