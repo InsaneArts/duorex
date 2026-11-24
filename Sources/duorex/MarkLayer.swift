@@ -18,39 +18,12 @@ final class MarkLayer {
     /// How far in front of the screen a disc lies, in the model's centimeters. A bent screen is
     /// round at the fold, not sharp, and a disc at the fold must clear that curve.
     private static let lift: Float = 0.15
-    /// The colour of a touch that is not the user's own.
-    private static let accent = CGColor(srgbRed: 1, green: 0.4, blue: 0.08, alpha: 1)
 
     init() throws {
-        let spot = try Self.material { context, size in
-            // A white rim inside a dark edge keeps the spot readable on any screen, light or dark.
-            let whole = CGRect(x: 0, y: 0, width: size, height: size)
-            context.setFillColor(CGColor(gray: 0, alpha: 0.25))
-            context.fillEllipse(in: whole.insetBy(dx: size * 0.02, dy: size * 0.02))
-            context.setFillColor(CGColor(gray: 1, alpha: 1))
-            context.fillEllipse(in: whole.insetBy(dx: size * 0.07, dy: size * 0.07))
-            context.setFillColor(Self.accent)
-            context.fillEllipse(in: whole.insetBy(dx: size * 0.15, dy: size * 0.15))
-        }
-        let ring = try Self.material { context, size in
-            let circle = CGRect(x: 0, y: 0, width: size, height: size).insetBy(dx: size * 0.09, dy: size * 0.09)
-            context.setStrokeColor(CGColor(gray: 0, alpha: 0.2))
-            context.setLineWidth(size * 0.13)
-            context.strokeEllipse(in: circle)
-            context.setStrokeColor(Self.accent)
-            context.setLineWidth(size * 0.08)
-            context.strokeEllipse(in: circle)
-        }
-        let finger = try Self.material { context, size in
-            // Pale and half clear, so the user sees what is under a finger of their own.
-            let whole = CGRect(x: 0, y: 0, width: size, height: size)
-            context.setFillColor(CGColor(gray: 0, alpha: 0.3))
-            context.fillEllipse(in: whole.insetBy(dx: size * 0.02, dy: size * 0.02))
-            context.setBlendMode(.copy)
-            context.setFillColor(CGColor(gray: 1, alpha: 0.6))
-            context.fillEllipse(in: whole.insetBy(dx: size * 0.08, dy: size * 0.08))
-        }
-        looks = [.spot: spot, .ring: ring, .finger: finger]
+        looks = try Dictionary(uniqueKeysWithValues: [Mark.Look.spot, .ring, .finger].map { look in
+            guard let picture = look.picture else { throw DuoError.render("could not draw a touch mark") }
+            return (look, try Self.material(picture))
+        })
     }
 
     /// Draws `marks` on the screen whose leaves are `leaves`. Each call replaces the marks of the call before.
@@ -97,15 +70,8 @@ final class MarkLayer {
         for disc in discs[used...] { disc.isEnabled = false }
     }
 
-    /// A material that shows a square picture with a clear background, drawn by `draw` in a
-    /// context of `size` pixels each way.
-    private static func material(_ draw: (CGContext, CGFloat) -> Void) throws -> UnlitMaterial {
-        let size = 256
-        guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        else { throw DuoError.render("could not draw a touch mark") }
-        draw(context, CGFloat(size))
-        guard let image = context.makeImage() else { throw DuoError.render("could not draw a touch mark") }
+    /// A material that shows a square picture with a clear background.
+    private static func material(_ image: CGImage) throws -> UnlitMaterial {
         // Like the screen, a mark is a light: unlit, and outside the tone mapping the body gets.
         var material = UnlitMaterial(applyPostProcessToneMap: false)
         material.color = .init(tint: .white, texture: .init(try TextureResource(image: image, options: .init(semantic: .color))))
@@ -113,5 +79,45 @@ final class MarkLayer {
         // A mark hides behind the device, but never behind another mark.
         material.writesDepth = false
         return material
+    }
+}
+
+extension Mark.Look {
+    /// The colour of a touch that is not the user's own.
+    private static let accent = CGColor(srgbRed: 1, green: 0.4, blue: 0.08, alpha: 1)
+
+    /// The look as a square picture with a clear background, 256 pixels each way.
+    var picture: CGImage? {
+        let size = 256
+        guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        let whole = CGRect(x: 0, y: 0, width: size, height: size), side = CGFloat(size)
+        switch self {
+        case .spot:
+            // A white rim inside a dark edge keeps the spot readable on any screen, light or dark.
+            context.setFillColor(CGColor(gray: 0, alpha: 0.25))
+            context.fillEllipse(in: whole.insetBy(dx: side * 0.02, dy: side * 0.02))
+            context.setFillColor(CGColor(gray: 1, alpha: 1))
+            context.fillEllipse(in: whole.insetBy(dx: side * 0.07, dy: side * 0.07))
+            context.setFillColor(Self.accent)
+            context.fillEllipse(in: whole.insetBy(dx: side * 0.15, dy: side * 0.15))
+        case .ring:
+            let circle = whole.insetBy(dx: side * 0.09, dy: side * 0.09)
+            context.setStrokeColor(CGColor(gray: 0, alpha: 0.2))
+            context.setLineWidth(side * 0.13)
+            context.strokeEllipse(in: circle)
+            context.setStrokeColor(Self.accent)
+            context.setLineWidth(side * 0.08)
+            context.strokeEllipse(in: circle)
+        case .finger:
+            // Pale and half clear, so the user sees what is under a finger of their own.
+            context.setFillColor(CGColor(gray: 0, alpha: 0.3))
+            context.fillEllipse(in: whole.insetBy(dx: side * 0.02, dy: side * 0.02))
+            context.setBlendMode(.copy)
+            context.setFillColor(CGColor(gray: 1, alpha: 0.6))
+            context.fillEllipse(in: whole.insetBy(dx: side * 0.08, dy: side * 0.08))
+        }
+        return context.makeImage()
     }
 }
