@@ -2,7 +2,7 @@
 
 Each release of duorex, newest first. Changes that are not in a release yet are under `## Unreleased`.
 
-## Unreleased
+## 0.3.0
 
 **Every iPhone**
 - duorex shows any iPhone. The Duo stays in 3D. Every other iPhone is drawn flat, in the chrome Simulator.app uses, with its live screen, its side buttons and the agent's marks.
