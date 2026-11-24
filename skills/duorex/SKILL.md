@@ -7,7 +7,7 @@ description: Builds an iOS app, runs it on an iPhone Duo simulator and uses it t
 
 duorex shows an iPhone Duo simulator as a 3D device in a pane of Rex, and gives you shell commands to run an app on it and use it. The user watches: each touch you make shows on the device as an orange spot.
 
-Every command ends with a line that says how the device is, such as `inner screen 2852x2006, hinge 180, held upright`. The lit screen and its size come from the simulator. The hinge is the angle that duorex last asked for, because the simulator does not report it with Xcode 27.2, and it is `unknown` until something folds the device. To check a fold, look at which screen is lit, and take a screenshot.
+Every command ends with a line that says how the device is, such as `inner screen 2853x2007, hinge 180, held upright`. The lit screen, its size and the hinge come from the simulator. To check a fold, look at which screen is lit, and take a screenshot.
 
 ## Run the app
 
