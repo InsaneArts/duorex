@@ -258,7 +258,7 @@ case "fold":
         return "folded to \(Int(target))"
     }
 case "rotate":
-    let holds: [String: Orientation] = ["upright": .portrait, "clockwise": .landscapeLeft, "upside-down": .upsideDown, "counterclockwise": .landscapeRight]
+    let holds: [String: Orientation] = ["upright": .portrait, "clockwise": .landscapeRight, "upside-down": .upsideDown, "counterclockwise": .landscapeLeft]
     guard let held = arguments.words.first.flatMap({ holds[$0] }) else { wrongUse("rotate upright|clockwise|upside-down|counterclockwise") }
     onSimulator { driver in
         guard await driver.turn(to: held) else {

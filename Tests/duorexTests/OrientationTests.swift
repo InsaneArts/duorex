@@ -26,7 +26,7 @@ func `a touch at the bottom of the interface is the swipe home`(orientation: Ori
     #expect(orientation.homeEdge(atFramebufferPoint: middle) == nil)
 }
 
-@Test func `four quarter turns come back to portrait`() {
+@Test func `four quarter turns clockwise come back to portrait`() {
     var orientation = Orientation.portrait
     var rolls: [Double] = []
     for _ in 0..<4 {
@@ -34,7 +34,7 @@ func `a touch at the bottom of the interface is the swipe home`(orientation: Ori
         rolls.append(orientation.roll)
     }
     #expect(orientation == .portrait)
-    #expect(rolls == [-90, -180, 90, 0])
+    #expect(rolls == [90, -180, -90, 0])
 }
 
 @Test func `the simulator's names decode`() {

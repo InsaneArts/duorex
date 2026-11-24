@@ -2,7 +2,7 @@
 nonisolated struct Pose: Equatable {
     /// 0 is closed, 180 is flat.
     var hinge: Double = 180
-    /// Rotation about the view axis.
+    /// Rotation about the view axis, in degrees clockwise on the screen.
     var roll: Double = 0
     /// Tilt left and right.
     var yaw: Double = 0

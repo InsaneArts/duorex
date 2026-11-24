@@ -12,7 +12,7 @@ enum Strobe {
 
     /// The device as it lies for the picture: on its back, seen from the front and from above.
     private static func pose(hinge: Double) -> Pose {
-        Pose(hinge: hinge, roll: -24, pitch: -52, isAnchored: true)
+        Pose(hinge: hinge, roll: 24, pitch: -52, isAnchored: true)
     }
 
     static func image(scene: DuoScene, width: Int, height: Int) async throws -> CGImage {

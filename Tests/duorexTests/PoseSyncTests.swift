@@ -39,17 +39,17 @@ import Testing
 
 @Test func `a stale report does not undo the user's turn`() {
     var sync = PoseSync()
-    #expect(sync.userTurned(time: 5) == .landscapeLeft)
+    #expect(sync.userTurned(time: 5) == .landscapeRight)
     // Sent before the simulator turned.
     #expect(sync.simulatorReported(held: .portrait, time: 5.2) == nil)
-    #expect(sync.held == .landscapeLeft)
+    #expect(sync.held == .landscapeRight)
     // The simulator confirms the turn.
-    #expect(sync.simulatorReported(held: .landscapeLeft, time: 5.6) == nil)
+    #expect(sync.simulatorReported(held: .landscapeRight, time: 5.6) == nil)
 }
 
 @Test func `a turn from elsewhere is taken`() {
     var sync = PoseSync()
     _ = sync.userTurned(time: 5)
-    #expect(sync.simulatorReported(held: .landscapeRight, time: 30) == .landscapeRight)
-    #expect(sync.held == .landscapeRight)
+    #expect(sync.simulatorReported(held: .landscapeLeft, time: 30) == .landscapeLeft)
+    #expect(sync.held == .landscapeLeft)
 }
