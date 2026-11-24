@@ -1,98 +1,68 @@
 ---
 name: duorex
-description: Builds an iOS app, runs it on an iPhone Duo simulator or another iPhone simulator and uses it there - looks at the screen, taps, swipes, folds and rotates the device, and checks its postures - while the user watches the device in a Rex pane. Use when the user asks to run, try, test, check or show an app on iPhone Duo, "the Duo" or the foldable iPhone; after you change an iOS app that must work on iPhone Duo; or when the user mentions duorex.
+description: Runs an iOS app on an iPhone simulator and uses it as a person does - screenshots, taps, swipes, typing, hardware buttons, turns, and folds on iPhone Duo - while the user watches the device in a Rex pane. Use it, rather than simctl or Simulator.app, whenever you build, run, test or check an iOS app; after any change to an iOS app that a person could see; and when the user mentions duorex, iPhone Duo or the foldable iPhone.
 ---
 
 # duorex
 
-duorex shows an iPhone Duo simulator as a 3D device in a pane of Rex, and gives you shell commands to run an app on it and use it. The user watches: each touch you make shows on the device as an orange spot.
+duorex runs an iPhone simulator in a pane of Rex: iPhone Duo as a 3D device that folds, any other iPhone flat. Shell commands run your app on it and use it. The user watches: each touch you make shows on the device as an orange mark, and the line under the device names what you did.
 
-Every command ends with a line that says how the device is, such as `inner screen 2853x2007, hinge 180, held upright`. The lit screen, its size and the hinge come from the simulator. To check a fold, look at which screen is lit, and take a screenshot.
+Every command ends with a line that says how the device is: `inner screen 2853x2007, hinge 180, held upright` on the Duo, `screen 1206x2622, held upright` on another iPhone. Read it after each command.
 
-## Run the app
+## The loop
 
-Run this in the folder of the Xcode project. The other commands work from any folder.
+Run these in order. Each step is done when its check holds.
 
-```sh
-duorex run
-```
+1. **Run.** In the folder of the Xcode project: `duorex run`. Done when it prints `running`. If the build fails, it prints the compiler's errors: fix them and run it again.
+2. **Look.** `duorex screenshot`, then read the PNG whose path it prints first. Done when you have seen your change on the screen, or seen that it is missing.
+3. **Use.** Tap, swipe, type and press, as the user would, with a screenshot after each action. Done when every path you changed has been walked and seen.
+4. **Postures.** On iPhone Duo, `duorex sweep`, then read the picture. Done when no posture cuts off, overlaps or puts a control on the fold. Fix what breaks and go back to step 1.
+5. **Report.** Tell the user what you saw, with the paths of the pictures.
 
-It builds the project for the Duo simulator, starts the app, and opens a duorex pane beside yours if none is open.
+The first run on a Mac makes and starts the simulator: one to three minutes. Give it a time limit of at least five minutes, plus the build.
 
-- If the project has several schemes, add `--scheme Name`.
-- If you built the app yourself, give it: `duorex run --app path/to/App.app`.
-- If the build fails, the command prints the compiler's errors. Fix them and run it again.
+## Which iPhone
 
-The first run on a Mac creates and starts the simulator, which takes one to three minutes. Give the first command a time limit of at least five minutes, plus the time the build takes.
-
-## Look
+Without `--device`, duorex uses iPhone Duo. For another iPhone, add the same `--device` to every command:
 
 ```sh
-duorex screenshot                    # or: duorex screenshot --out /path/shot.png
-```
-
-The first line it prints is the path of a PNG of the lit screen, the way the user sees it. Read that file. Take a screenshot after each action: it is the only way to know what the app did.
-
-`duorex screenshot --grid` draws a line at each tenth of the picture, with its number. Use it to find the numbers for a tap.
-
-What is normal on a Duo screen:
-
-- The clock and the status marks are in a column at one side, and the cover screen has a camera hole. The system keeps that space free, so an app's content is centred in what is left and can sit a little off the middle of the picture.
-- On the inner screen, the fold runs through the middle of the picture's longer side: at x = 0.5 on a wide picture. A control that lies across that line is on the fold.
-
-## Touch
-
-A point is two numbers from 0 to 1 on the newest screenshot: x runs right, y runs down. After a fold or a turn, take a new screenshot before you tap.
-
-```sh
-duorex tap 0.62 0.35
-duorex swipe 0.5 0.8 0.5 0.3     # a finger moves from the first point to the second
-duorex home
-duorex press power               # power, volume-up, volume-down, camera, action
-duorex type "hello@example.com"  # into the field that has focus; tap the field first
-```
-
-`type` takes printable ASCII, as on a US keyboard. A line break in the text is the return key.
-
-## Other iPhones
-
-The Duo is the default. To use another iPhone, add `--device` to every command, with a model that `duorex devices` lists or a simulator's name:
-
-```sh
-duorex run --device "iPhone 18 Pro"
+duorex devices                              # the iPhones duorex shows, and their simulators
+duorex run --device "iPhone 18 Pro"         # a model from that list
 duorex screenshot --device "iPhone 18 Pro"
 ```
 
-The first command makes and starts the simulator, which takes a minute or two. These iPhones have one screen, so the last line is like `screen 1206x2622, held upright`, and they do not fold: `fold` and `sweep` need the Duo.
+A model's simulator is made on first use. A simulator's own name or UDID works too. Use the iPhone the user names. Only the Duo folds: `fold` and `sweep` need it.
 
-## Fold and turn
+## Commands
 
-```sh
-duorex fold book                 # closed (0), book (130), open (180), or an angle
-duorex rotate clockwise          # upright, clockwise, upside-down, counterclockwise
-```
+| Command | What it does |
+|---|---|
+| `duorex run [--scheme Name] [--app App.app]` | Builds the project here, starts the app, and opens the pane beside yours |
+| `duorex screenshot [--out shot.png] [--grid] [--full]` | The screen as the user sees it, upright. `--grid` numbers each tenth |
+| `duorex tap X Y` | One tap. X and Y run from 0 to 1 on the newest screenshot, from the top left |
+| `duorex swipe X1 Y1 X2 Y2 [--seconds 0.25]` | A finger from the first point to the second |
+| `duorex type "text"` | Types into the field that has focus. Tap the field first |
+| `duorex home` | Goes home, with the swipe up from the bottom edge |
+| `duorex press power` | Also `volume-up`, `volume-down`, `action`, and `camera` on the Duo |
+| `duorex rotate clockwise` | Also `upright`, `upside-down`, `counterclockwise` |
+| `duorex fold book` | The Duo's hinge: `closed`, `book`, `open`, or an angle from 0 to 180 |
+| `duorex sweep [--out sheet.png]` | One picture of the Duo closed, as a book and open, upright and turned |
+| `duorex open` | Opens the pane only |
 
-A closed device shows the app on its small cover screen. From about half open, the app is on the inner screen. The app lays out again each time.
+After a fold or a turn, take a new screenshot before you tap: the points move with the interface.
 
-## Check the postures
+`type` takes printable ASCII on a US keyboard. A line break is the return key. It returns once the app has taken every key.
 
-```sh
-duorex sweep
-```
+## What the screen shows
 
-It saves one picture of six postures: closed, book and open, each held upright and turned clockwise. Its last line is the picture's path. Read the picture to find a posture where the layout breaks: content that is cut off, that overlaps, or that lies on the fold. The sweep puts the device back in the posture it had. For the two other holds, use `duorex rotate`.
+- iPhone Duo: the clock and status marks stand in a column at one side, and the cover screen has a camera hole. The system keeps that space free, so content can sit a little off the middle. Closed, the app is on the small cover screen. From about half open, it is on the inner screen, where the fold runs across the middle of the longer side: x = 0.5 on a wide picture.
+- Other iPhones: the Dynamic Island is in the screenshot, as the simulator draws it.
+- An app lays out again after each fold and each turn.
 
-## The usual order
+## The pane
 
-1. `duorex run`
-2. `duorex screenshot`, and read it. Is the change you made there?
-3. Use the app: tap, swipe, take a screenshot, read it.
-4. `duorex sweep`, and read it. Fix what breaks in a posture, then go back to step 1.
-5. Tell the user what you saw, and give the paths of the pictures.
+- The pane is the user's. Leave it open. If it is gone, `duorex run` or `duorex open` brings it back.
+- Outside Rex there is no pane. Every command works the same.
+- Pictures go to a temporary folder unless you give `--out`. Keep them out of the project folder.
 
-## Limits
-
-- You cannot type text into the app. Put test text in the app through its launch state or its code.
-- The pane is the user's. Do not close it. If the user closed it, `duorex run` opens it again.
-- Outside Rex there is no pane. The commands work the same.
-- Save pictures outside the project folder, or they end up in the user's repository.
+The keys the user has in the pane, the pictures and movies duorex makes for them, and what to do when a command fails are in [REFERENCE.md](REFERENCE.md). Read it when the user asks about the pane, a picture or a movie, or when a command fails.

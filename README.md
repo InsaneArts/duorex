@@ -113,7 +113,7 @@ duorex sweep                     # six postures in one picture
 
 When the agent touches the screen, you see where: a tap leaves a spot with a ring, and a swipe draws a trail as the finger moves. The line under the device says what the agent does, such as `agent · swipe ↑`. Your own touches leave no mark. The marks are part of the device, so `duorex record` puts them in the movie too. When the agent folds the device, the one in your pane folds too.
 
-The installer gives Claude Code, Codex and pi a skill named `duorex`. It tells them these commands and when to use them, so "run it on the Duo" is enough.
+The installer gives Claude Code, Codex and pi a skill named `duorex`. It tells them every command, and to use duorex whenever they build, run or check an iOS app, so in an iOS project "run it" is enough.
 
 duorex runs the simulator through [simhost](https://github.com/InsaneArts/simhost). A tool that drives the simulator through simhost shows in the pane the same way.
 
