@@ -25,7 +25,8 @@ final class Sim {
     private var screens: Screens?
     private var host: HostClient?
     private let mailbox = Mailbox()
-    private var isDuo = false
+    /// True for iPhone Duo, false for a device with one screen. Known once connected.
+    private(set) var isDuo = false
     private var state: Wire.State?
     /// The newest picture of each panel, and how its interface is turned.
     private var latest: [SimHostKit.Panel: SimHostKit.Frame] = [:]
@@ -213,7 +214,7 @@ final class Sim {
         guard let state else { return }
         let interface = latest[litPanel].map { Orientation($0.orientation) } ?? .portrait
         onReport?(SimWire.Report(width: litPanel.width, orientation: interface.rawValue, hingeDegrees: state.hinge,
-                                 duoViewOrientation: isDuo ? Orientation(state.held).rawValue : nil))
+                                 duoViewOrientation: Orientation(state.held).rawValue))
     }
 }
 

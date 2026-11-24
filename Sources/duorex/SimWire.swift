@@ -11,7 +11,7 @@ nonisolated enum SimWire {
         /// How the interface is turned inside the lit panel's framebuffer.
         var orientation: String
         var hingeDegrees: Double?
-        /// How the device is held.
+        /// How the device is held. The name is serve-sim's, from when only iPhone Duo had it.
         var duoViewOrientation: String?
     }
 
