@@ -30,6 +30,13 @@ main() {
   # v1.2.3 are releases: any other tag, a release candidate included, is passed over.
   tag=$(git -C "$src" tag --list 'v*' --sort=-version:refname | grep -Ex 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
   target=$(git -C "$src" rev-parse "${tag:-origin/main}^{commit}")
+  # The installer that runs can be older than the release it installs: `duorex update` runs the
+  # copy from the release before. The release's own installer takes over, once, so that its
+  # changes count in this update too.
+  if [ -z "${DUOREX_FRESH_INSTALLER:-}" ] && ! git -C "$src" diff --quiet "$target" -- install.sh 2>/dev/null; then
+    git -C "$src" checkout --quiet --force --detach "$target"
+    DUOREX_FRESH_INSTALLER=1 exec sh "$src/install.sh"
+  fi
   if [ -x "$bin/duorex" ] && [ "$(cat "$src/../installed" 2>/dev/null)" = "$target" ]; then
     install_rex_action
     install_skill
