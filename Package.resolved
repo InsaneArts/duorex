@@ -1,12 +1,12 @@
 {
-  "originHash" : "239a00d0cf39b82577fffbce652a7bdaf4f4093930d077cd52172450e597f920",
+  "originHash" : "c2b26548b2c44f1b51a0fdc191a5021290e2f60e10b58af968b204347fb039ed",
   "pins" : [
     {
       "identity" : "simhost",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/InsaneArts/simhost.git",
       "state" : {
-        "revision" : "c724aa2ecf956696a72d4135face911bfc933d43"
+        "revision" : "2b0009490c8464c9a4db46779f8c30d2601c9bf4"
       }
     }
   ],

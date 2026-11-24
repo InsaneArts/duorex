@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     dependencies: [
         // One revision of simhost, so that a build of duorex always gets the same code.
-        .package(url: "https://github.com/InsaneArts/simhost.git", revision: "c724aa2ecf956696a72d4135face911bfc933d43"),
+        .package(url: "https://github.com/InsaneArts/simhost.git", revision: "2b0009490c8464c9a4db46779f8c30d2601c9bf4"),
     ],
     targets: [
         .executableTarget(
